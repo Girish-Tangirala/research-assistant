@@ -1,0 +1,18 @@
+# Runtime
+anthropic>=1.6,<2          # Claude API (streaming, tool use, adaptive thinking, fallbacks)
+customtkinter>=5.2         # Modern dark-mode Tk GUI
+GitPython>=3.1.43          # clone / pull / branch / commit / push
+keyring>=25                # stores sign-ins in Windows Credential Manager / Keychain
+pillow>=10                 # figure previews, image conversion, image input for captions
+pypdfium2>=4.30            # renders the PDF preview pane (PDFium, Apache/BSD licensed)
+python-dotenv>=1.0         # optional .env for non-secret settings
+
+# Development
+pytest>=8
+pytest-timeout>=2      # guards the multi-user Git tests against hangs
+
+# System requirements (not pip-installable):
+#   - Python >= 3.10 with Tk (bundled with python.org installers)
+#   - git >= 2.31 on PATH (token injection uses GIT_CONFIG_* env vars)
+#   - Internet access to api.openalex.org, api.crossref.org, export.arxiv.org (literature search)
+#   - A TeX distribution providing latexmk or pdflatex + bibtex (TeX Live / MiKTeX)
