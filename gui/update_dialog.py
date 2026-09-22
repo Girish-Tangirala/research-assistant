@@ -20,6 +20,7 @@ from gui.dialogs import MUTED, OK, _Dialog, run_in_background
 from version import UPDATE_REPO, __version__
 
 logger = logging.getLogger("research_agent")
+UPDATING = "Updating, app will restart after update"
 
 
 class UpdateDialog(_Dialog):
@@ -60,26 +61,37 @@ class UpdateDialog(_Dialog):
             return
         self._running = True
         logger.info("Update %s: 'Update now' pressed", self.release.version)
-        self.busy(f"Downloading version {self.release.version}…")
+        self.busy(f"{UPDATING}\nStarting the download…")
+        self.bar.set(0)
         run_in_background(self, lambda: stage(self.release, self.app_dir, progress=self._on_progress),
                           self._staged, self._failed)
-        self.after(200, self._poll)
+        self.after(100, self._poll)
 
     def _on_progress(self, done: int, total: int) -> None:
         self._progress = (done, total)
 
     def _poll(self) -> None:
+        """Download = first 90 % of the bar, unpacking the next 5 %, restarting the rest."""
+        if not self._running:  # finished (or failed) meanwhile: don't overwrite "Restarting now"
+            return
         done, total = self._progress
-        if total:
-            self.bar.set(done / total)
-            self.status.configure(text=f"{done / 1e6:.0f} of {total / 1e6:.0f} MB", text_color=MUTED)
+        if total and done < total:
+            self.bar.set(0.9 * done / total)
+            self._say(f"Downloading version {self.release.version}: {done / 1e6:.0f} of {total / 1e6:.0f} MB")
+        elif total:
+            self.bar.set(0.95)
+            self._say("Unpacking the new version…")
         if self._running:
-            self.after(200, self._poll)
+            self.after(100, self._poll)
+
+    def _say(self, step: str, color: str = MUTED) -> None:
+        self.status.configure(text=f"{UPDATING}\n{step}", text_color=color)
 
     def _staged(self, staged: Any) -> None:
         self._running = False
         self.bar.set(1)
-        self.status.configure(text="Installing - the app restarts in a few seconds…", text_color=OK)
+        self._say("Restarting now…", OK)
+        self.update_idletasks()
         launch = lambda: launch_swap(self.app_dir, staged, tools_dir() / "updates")  # noqa: E731
         if not self.master.quit_for_update(launch):
             self.fail("Update not installed: the app was not closed. It is downloaded; choose Update now again.")
@@ -136,5 +148,5 @@ class UpdateMixin:
         self._save_state()
         if self.cancel_token:
             self.cancel_token.cancel()
-        self.after(200, self.destroy)
+        self.after(1000, self.destroy)  # long enough to read "Restarting now"
         return True

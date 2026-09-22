@@ -78,10 +78,11 @@ def test_plan_sorts_files_and_leaves_latex_essentials_alone(tmp_path):
         "meeting.md": "notes/meeting.md",
         "figs/loss.png": "figures/loss.png",
         "figs/setup.jpg": "figures/setup.jpg",
+        "unused-photo.png": "figures/unused-photo.png",           # every image is sorted, used or not
     }
     kept = dict(plan.kept)
     assert "main.tex" in kept and "zotero.bib" in kept          # root document and the Zotero file stay
-    assert "ieee.cls" not in moves and "unused-photo.png" not in moves
+    assert "ieee.cls" in kept and "ieee.cls" not in moves        # LaTeX needs it next to main.tex
     assert any("data file(s) move into data/" in w for w in plan.warnings)
 
     report = plan_to_markdown(plan, "Test paper")
@@ -136,8 +137,8 @@ def test_organise_workflow_moves_files_and_commits_once(tmp_path, old_remote):
     assert "committed locally" in result.summary
     assert files_of(clone) == sorted([
         "bibliography/refs.bib", "code/analysis.py", "data/measurements.csv", "figures/loss.png",
-        "figures/setup.jpg", "ieee.cls", "main.tex", "manuscript/appendix.tex", "manuscript/method.tex",
-        "notes/meeting.md", "unused-photo.png", "zotero.bib",
+        "figures/setup.jpg", "figures/unused-photo.png", "ieee.cls", "main.tex", "manuscript/appendix.tex",
+        "manuscript/method.tex", "notes/meeting.md", "zotero.bib",
     ])
     assert looks_scaffolded(clone)
     main = (clone / "main.tex").read_text(encoding="utf-8")
@@ -145,7 +146,7 @@ def test_organise_workflow_moves_files_and_commits_once(tmp_path, old_remote):
     repo = Repo(clone)
     assert repo.active_branch.name == "master" and not repo.is_dirty(untracked_files=True)
     head = repo.head.commit
-    assert head.message.startswith("Organise 8 file(s) into folders")
+    assert head.message.startswith("Organise 9 file(s) into folders")
     changed = repo.git.show("--name-status", "--format=", "HEAD")
     assert changed.count("R") >= 6 or changed.count("D") >= 6      # recorded as moves (or delete + add)
     assert [h.name for h in Repo(old_remote).heads] == ["master"]  # local-first: nothing pushed
@@ -233,3 +234,29 @@ def test_undoing_moves_removes_the_folders_they_created(tmp_path):
     assert (root / "images" / "a.png").is_file()
     assert not (root / "figures").exists()          # created by the move, empty again -> gone
     assert (root / "data" / "README.md").is_file()  # unrelated folders untouched
+
+
+def test_every_file_kind_gets_its_folder_and_emptied_folders_go(tmp_path):
+    from PIL import Image
+
+    from core.events import ProposedChange
+    from core.paper import AppliedChanges, apply_changes
+    from core.reorganize import unsorted_files
+
+    root = tmp_path / "paper"
+    (root / "images").mkdir(parents=True)
+    (root / "main.tex").write_text("\\documentclass{article}\\begin{document}Hi\\end{document}\n", encoding="utf-8")
+    (root / "IEEEtran.cls").write_text("% class\n", encoding="utf-8")
+    make_image(root / "images" / "unused.png")
+    make_image(root / "Plot.png")
+    page = Image.new("RGB", (60, 80), "white")
+    page.save(root / "manual.pdf", "PDF", save_all=True, append_images=[page.copy()])   # 2 pages: a document
+    page.save(root / "diagram.pdf", "PDF")                                              # 1 page: a figure
+    assert sorted(unsorted_files(root, "main.tex")) == ["Plot.png", "diagram.pdf", "manual.pdf"]
+    plan = plan_reorganisation(root, files_of(root), "main.tex", lambda rel: None)
+    assert dict(plan.moves) == {"images/unused.png": "figures/unused.png", "Plot.png": "figures/Plot.png",
+                                "manual.pdf": "notes/manual.pdf", "diagram.pdf": "figures/diagram.pdf"}
+    apply_changes([ProposedChange(root, "(moves)", "", "", "move", moves=plan.moves)], AppliedChanges(root))
+    assert not (root / "images").exists()             # emptied by the move -> removed
+    assert unsorted_files(root, "main.tex") == []     # only main.tex and the class file are left on top
+    assert sorted(p.name for p in root.iterdir()) == ["IEEEtran.cls", "figures", "main.tex", "notes"]

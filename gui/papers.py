@@ -16,8 +16,9 @@ from core.app_state import PaperSpec
 from core.credentials import host_of, is_https
 from core.events import EventKind
 from core.git_manager import GitManager, GitOperationError
-from core.latex_parser import list_section_titles
-from core.project_layout import FOLDERS, ensure_data_folder, looks_scaffolded, present_folders, scaffold
+from core.latex_parser import find_main_tex, list_section_titles
+from core.project_layout import FOLDERS, ensure_data_folder, present_folders, scaffold
+from core.reorganize import unsorted_files
 from core.workflows import OrganizeWorkflow, PublishWorkflow
 from core.protection import ProtectionPolicy
 from gui.dialogs import PaperDialog, run_in_background
@@ -61,8 +62,9 @@ class PapersMixin:
                 lines.append("Folders: " + ", ".join(f"{name}/" for name in folders))
             if locked:
                 lines.append(f"Read-only: {', '.join(locked)}")
-            if root.is_dir() and not looks_scaffolded(root):
-                lines.append("Not organised into folders yet - File ▸ Organise paper into folders…")
+            unsorted = self._unsorted_files(root)
+            if unsorted:
+                lines.append(f"{len(unsorted)} file(s) not in folders yet - File ▸ Organise paper into folders…")
             self.paper_info.configure(text="\n".join(lines))
         else:
             self.paper_info.configure(text="Create a new paper folder, or add the Overleaf/GitHub repository "
@@ -251,7 +253,7 @@ class PapersMixin:
             elif title is not None and has_tex:
                 self.panel.append(EventKind.INFO, "The Overleaf project already has a paper, so its files were "
                                                   "left as they are.")
-            if root.is_dir() and not looks_scaffolded(root):
+            if self._unsorted_files(root):
                 self.panel.append(EventKind.INFO, "To sort its files into folders, use "
                                                   "File ▸ Organise paper into folders…")
             self._refresh_papers()
@@ -259,6 +261,12 @@ class PapersMixin:
 
         run_in_background(self, work, done, lambda exc: self.panel.append(
             EventKind.ERROR, f"Could not clone the paper: {exc}"))
+
+    @staticmethod
+    def _unsorted_files(root: Path) -> list[str]:
+        """Top-level files that File ▸ Organise paper into folders would still move."""
+        main = find_main_tex(root) if root.is_dir() else None
+        return unsorted_files(root, main.name if main is not None and main.parent == root else "")
 
     def _load_sections(self) -> list[str]:
         spec = self.app_state.current

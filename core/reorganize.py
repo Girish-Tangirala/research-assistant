@@ -64,8 +64,30 @@ class ReorgPlan:
         return not self.moves and not self.rewrites
 
 
-def _category(rel: str, name: str, suffix: str, referenced_images: set[str]) -> str | None:
-    """Target folder for a file, or ``None`` to leave it where it is."""
+def _pdf_pages(path: Path) -> int:
+    """Number of pages of a PDF (0 if it cannot be read)."""
+    try:
+        import pypdfium2 as pdfium
+
+        from core.preview import PDFIUM_LOCK
+
+        with PDFIUM_LOCK:
+            document = pdfium.PdfDocument(path.read_bytes())
+            try:
+                return len(document)
+            finally:
+                document.close()
+    except Exception:  # noqa: BLE001 - an unreadable PDF is simply not treated as a document
+        return 0
+
+
+def _category(rel: str, name: str, suffix: str, referenced_images: set[str], root: Path | None = None) -> str | None:
+    """Target folder for a file, or ``None`` to leave it where it is.
+
+    Every image goes to ``figures/``, used by the paper or not. A PDF is a figure when the
+    paper includes it or it has one page; a longer PDF (a manual, a compiled copy of the
+    paper) is a document and goes to ``notes/``.
+    """
     if name.lower() in KEEP_AT_ROOT_NAMES or suffix in KEEP_AT_ROOT_EXTS:
         return None
     if suffix in TEX_EXTS:
@@ -76,13 +98,22 @@ def _category(rel: str, name: str, suffix: str, referenced_images: set[str]) -> 
         return "code"
     if suffix in DATA_EXTS:
         return "data"
+    if suffix == ".pdf" and rel not in referenced_images:
+        return "notes" if root is not None and _pdf_pages(root / rel) > 1 else "figures"
     if suffix in FIGURE_EXTS:
-        # A stray PDF at the root is usually a compiled document, not a figure.
-        in_figure_folder = PurePosixPath(rel).parts[0].lower() in ALIASES["figures"] if "/" in rel else False
-        return "figures" if (rel in referenced_images or in_figure_folder) else None
+        return "figures"
     if suffix in NOTE_EXTS:
         return "notes"
     return None
+
+
+def unsorted_files(root: Path, main_rel: str) -> list[str]:
+    """Top-level files that organising would move (for the sidebar's "not organised" hint)."""
+    if not root.is_dir():
+        return []
+    return [p.name for p in sorted(root.iterdir())
+            if p.is_file() and p.name != main_rel and not p.name.startswith(".")
+            and _category(p.name, p.name, p.suffix.lower(), set(), None) is not None]
 
 
 def _target_path(rel: str, folder: str, taken: set[str]) -> str:
@@ -175,8 +206,12 @@ def plan_reorganisation(root: Path, files: list[str], main_rel: str, is_protecte
         if reason:
             plan.kept.append((rel, reason))
             continue
-        folder = _category(rel, path.name, path.suffix.lower(), images)
+        folder = _category(rel, path.name, path.suffix.lower(), images, root)
         if folder is None:
+            if path.suffix.lower() in KEEP_AT_ROOT_EXTS:
+                plan.kept.append((rel, "LaTeX and Overleaf only find class/style files next to the root document"))
+            elif "/" not in rel and path.name.lower() not in KEEP_AT_ROOT_NAMES:
+                plan.kept.append((rel, "unknown kind of file - move it by hand if it belongs in a folder"))
             continue
         if path.parts[0] == folder:            # already in the right place
             continue

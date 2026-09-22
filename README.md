@@ -195,13 +195,25 @@ Use the **Paper** dropdown to choose what you're working on, and **Add / Edit / 
 ### Organise an existing paper
 
 A paper you wrote before using the app can be sorted into the same folders: **File ▸ Organise paper into
-folders…**. The sidebar says when a paper isn't organised yet.
+folders…**. The sidebar shows how many top-level files are not in a folder yet.
 
-- **What moves:** `.tex` files into `manuscript/`, images that the paper actually uses into `figures/`,
-  `.bib` into `bibliography/`, scripts into `code/`, datasets into `data/`, notes (`.md`, `.txt`) into
-  `notes/`. Sub-folders are kept, so `sections/appendix/a.tex` becomes `manuscript/appendix/a.tex`.
-- **What stays:** the root document (`main.tex`), class and style files (`.cls`, `.sty`, `.bst`), `README.md`,
-  `todo.md`, `.gitignore`, read-only (Zotero/Mendeley) files, and images no `\includegraphics` refers to.
+- **What moves:** every file goes to the folder for its kind, so each folder holds one kind of file:
+  - `.tex` files into `manuscript/`, `.bib` into `bibliography/`, scripts into `code/`, datasets into
+    `data/`, and notes (`.md`, `.txt`, `.docx`) into `notes/`.
+  - **Every image** goes into `figures/`, whether the paper uses it or not.
+  - **PDFs:** a PDF that the paper includes, or that has one page, is a figure and goes to `figures/`. A
+    longer PDF (a manual, a compiled copy of the paper) is a document and goes to `notes/`.
+  - Sub-folders are kept, so `sections/appendix/a.tex` becomes `manuscript/appendix/a.tex`.
+  - Folders that are empty after the move (such as an old `images/`) are removed.
+  - If the same image name exists twice (for example `SetUp.png` and `images/SetUp.png`), the one the paper
+    uses keeps its name and the other becomes `SetUp-2.png`.
+- **What stays:**
+  - the root document (`main.tex`);
+  - class and style files (`.cls`, `.sty`, `.bst`), because LaTeX and Overleaf only find them next to the
+    root document;
+  - `README.md`, `todo.md`, `.gitignore`, and read-only (Zotero/Mendeley) files;
+  - files of unknown kinds.
+
   The report lists everything that was left and why.
 - **Paths are rewritten:** every `\input`, `\include`, `\includegraphics`, `\bibliography` and
   `\addbibresource` that pointed at a moved file is updated, keeping the style you used (a path written
