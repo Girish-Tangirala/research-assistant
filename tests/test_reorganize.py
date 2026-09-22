@@ -195,3 +195,41 @@ def test_the_paper_still_compiles_after_being_organised(tmp_path):
     after = LatexCompiler(tex_settings(), tmp_path / "build-after").compile(root / "main.tex", root)
     assert after.success, after.summary()
     assert page_texts(after.pdf_path) == page_texts(before.pdf_path)   # same document, new folders
+
+
+def test_capitalised_image_names_are_rewritten_too(tmp_path):
+    """Paper 1 had images/full_R.png: paths were matched in lower case, so the rewrite missed them."""
+    root = tmp_path / "paper"
+    (root / "images").mkdir(parents=True)
+    make_image(root / "images" / "full_R.png")
+    make_image(root / "SetUp.png")
+    (root / "main.tex").write_text(r"""\documentclass{article}
+\usepackage{graphicx}
+\begin{document}
+\includegraphics[width=\linewidth, angle = 90]{images/full_R.png}
+\includegraphics{SetUp.png}
+\end{document}
+""", encoding="utf-8")
+    plan = plan_reorganisation(root, files_of(root), "main.tex", lambda rel: None)
+    assert dict(plan.moves) == {"images/full_R.png": "figures/full_R.png", "SetUp.png": "figures/SetUp.png"}
+    main = plan.rewrites["main.tex"]
+    assert "{figures/full_R.png}" in main and "{figures/SetUp.png}" in main
+
+
+def test_undoing_moves_removes_the_folders_they_created(tmp_path):
+    from core.events import ProposedChange
+    from core.paper import AppliedChanges, apply_changes, revert_changes
+
+    root = tmp_path / "paper"
+    (root / "images").mkdir(parents=True)
+    make_image(root / "images" / "a.png")
+    (root / "data").mkdir()
+    (root / "data" / "README.md").write_text("keep", encoding="utf-8")
+    change = ProposedChange(root, "(moves)", "", "", "move", moves=[("images/a.png", "figures/deep/a.png")])
+    applied = AppliedChanges(root)
+    apply_changes([change], applied)
+    assert (root / "figures" / "deep" / "a.png").is_file()
+    revert_changes(SimpleNamespace(discard_changes=lambda files: None), applied)
+    assert (root / "images" / "a.png").is_file()
+    assert not (root / "figures").exists()          # created by the move, empty again -> gone
+    assert (root / "data" / "README.md").is_file()  # unrelated folders untouched

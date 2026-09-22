@@ -299,7 +299,7 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
             emit(EventKind.AUTH_REQUIRED, str(exc), service="git", host=exc.host)
         except Exception as exc:  # noqa: BLE001 - worker boundary: report everything to the user
             emit(EventKind.STATE, WorkflowState.FAILED.value)
-            emit(EventKind.ERROR, f"{type(exc).__name__}: {exc}")
+            emit(EventKind.ERROR, f"{type(exc).__name__}: {exc}", failed=True)
             logger.error("Workflow failed\n%s", traceback.format_exc())
         finally:
             emit(EventKind.FINISHED, "")
@@ -347,6 +347,12 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
             self.panel.set_running(False)
             self.sync_button.configure(state="normal")
             self._refresh_sync_status()
+        elif kind == EventKind.ERROR and event.data.get("failed"):
+            # A task that stopped must not look like "nothing happened": say so where it can't be missed.
+            self.panel.append(kind, event.message)
+            detail = event.message.split(": ", 1)[-1]
+            messagebox.showerror("The task did not finish", detail[:1500] + "\n\nAnything it had not finished was "
+                                 "undone. The full details are in the Live Log (Agent tasks).", parent=self)
         else:
             self.panel.append(kind, event.message)
         if kind != EventKind.LLM_TEXT and kind != EventKind.THOUGHT and event.message:

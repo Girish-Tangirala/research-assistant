@@ -153,6 +153,14 @@ def revert_changes(git: GitManager, applied: AppliedChanges) -> None:
         if target.is_file() and not source.exists():
             source.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(target), str(source))
+    # Folders the moves created and that are empty again (e.g. figures/) go too; rmdir keeps non-empty ones.
+    folders = {parent for _s, target_rel in applied.moved for parent in (applied.root / target_rel).parents}
+    for folder in sorted(folders, key=lambda p: len(p.parts), reverse=True):
+        if folder != applied.root and applied.root in folder.parents:
+            try:
+                folder.rmdir()
+            except OSError:
+                pass
     moved_paths = {rel for pair in applied.moved for rel in pair}
     git.discard_changes([w for w in applied.written if w not in applied.created and w not in moved_paths])
     for rel in applied.created:

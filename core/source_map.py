@@ -91,12 +91,21 @@ def _key(path: Path | str) -> str:
 
 
 def repo_relative(path: Path, roots: list[Path]) -> str | None:
-    """``path`` relative to the first of ``roots`` containing it (POSIX), else ``None``."""
+    """``path`` relative to the first of ``roots`` containing it (POSIX), else ``None``.
+
+    Containment is checked case-insensitively on Windows, but the result keeps the file's real
+    spelling (``images/full_R.png``, not ``images/full_r.png``): it is compared with Git's file list.
+    """
     target = _key(path)
     for root in roots:
         base = _key(root)
         if target.startswith(base + os.sep):
-            return PurePosixPath(*Path(os.path.relpath(target, base)).parts).as_posix()
+            real = Path(path).resolve()  # on Windows this also restores the on-disk capitalisation
+            try:
+                rel = real.relative_to(Path(root).resolve())
+            except ValueError:  # e.g. differently spelled root; fall back to the given spelling
+                rel = Path(os.path.relpath(os.path.abspath(str(path)), os.path.abspath(str(root))))
+            return PurePosixPath(*rel.parts).as_posix()
     return None
 
 
