@@ -95,8 +95,9 @@ def github(method: str, url: str, token: str, body: bytes | None = None, content
 
 def set_version(new: str) -> None:
     path = ROOT / "version.py"
-    text = path.read_text(encoding="utf-8")
-    path.write_text(re.sub(r'__version__ = "[^"]*"', f'__version__ = "{new}"', text, count=1), encoding="utf-8")
+    text = path.read_bytes().decode("utf-8")
+    updated = re.sub(r'__version__ = "[^"]*"', f'__version__ = "{new}"', text, count=1)
+    path.write_bytes(updated.encode("utf-8"))  # keep the file's line endings
 
 
 def main() -> None:
@@ -143,7 +144,8 @@ def main() -> None:
 
     # 5. commit, tag, push
     tag = f"v{new}"
-    if run("git", "status", "--porcelain", "version.py"):
+    changed = subprocess.run(["git", "diff", "--quiet", "--", "version.py"], cwd=ROOT).returncode != 0
+    if changed:  # the first release keeps the version that is already committed
         run("git", "commit", "-m", f"Release {tag}", "--", "version.py")
     run("git", "tag", "-a", tag, "-m", f"Release {tag}")
     auth = git_auth_env(cred)
