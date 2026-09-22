@@ -212,8 +212,9 @@ def test_capitalised_image_names_are_rewritten_too(tmp_path):
 \end{document}
 """, encoding="utf-8")
     plan = plan_reorganisation(root, files_of(root), "main.tex", lambda rel: None)
-    assert dict(plan.moves) == {"images/full_R.png": "figures/full_R.png", "SetUp.png": "figures/SetUp.png"}
-    main = plan.rewrites["main.tex"]
+    assert dict(plan.moves) == {"images/full_R.png": "figures/full_R.png", "SetUp.png": "figures/SetUp.png",
+                                "main.tex": "manuscript/main.tex"}      # a one-file paper moves too
+    main = plan.rewrites["manuscript/main.tex"]
     assert "{figures/full_R.png}" in main and "{figures/SetUp.png}" in main
 
 
@@ -255,8 +256,70 @@ def test_every_file_kind_gets_its_folder_and_emptied_folders_go(tmp_path):
     assert sorted(unsorted_files(root, "main.tex")) == ["Plot.png", "diagram.pdf", "manual.pdf"]
     plan = plan_reorganisation(root, files_of(root), "main.tex", lambda rel: None)
     assert dict(plan.moves) == {"images/unused.png": "figures/unused.png", "Plot.png": "figures/Plot.png",
-                                "manual.pdf": "notes/manual.pdf", "diagram.pdf": "figures/diagram.pdf"}
-    apply_changes([ProposedChange(root, "(moves)", "", "", "move", moves=plan.moves)], AppliedChanges(root))
+                                "manual.pdf": "notes/manual.pdf", "diagram.pdf": "figures/diagram.pdf",
+                                "main.tex": "manuscript/main.tex"}
+    assert set(plan.created) == {"main.tex", "code/README.md"}   # top-level pointer + the code/ folder
+    changes = [ProposedChange(root, "(moves)", "", "", "move", moves=plan.moves)]
+    changes += [ProposedChange(root, rel, "", text, "new", placeholder=True) for rel, text in plan.created.items()]
+    apply_changes(changes, AppliedChanges(root))
     assert not (root / "images").exists()             # emptied by the move -> removed
-    assert unsorted_files(root, "main.tex") == []     # only main.tex and the class file are left on top
-    assert sorted(p.name for p in root.iterdir()) == ["IEEEtran.cls", "figures", "main.tex", "notes"]
+    assert unsorted_files(root, "main.tex") == []     # only the pointer and the class file are left on top
+    assert sorted(p.name for p in root.iterdir()) == ["IEEEtran.cls", "code", "figures", "main.tex",
+                                                      "manuscript", "notes"]
+
+
+SINGLE = r"""\documentclass{article}
+\usepackage{graphicx}
+\begin{document}
+\section{Introduction}
+Hello \includegraphics{Plot.png}
+\end{document}
+"""
+
+
+@pytest.fixture
+def single_file_remote(tmp_path: Path) -> Path:
+    """A paper written as one .tex file, like Paper 1 (and many papers that come from Git)."""
+    remote = tmp_path / "single.git"
+    Repo.init(remote, bare=True, initial_branch="master")
+    seed = tmp_path / "single-seed"
+    seed.mkdir()
+    (seed / "paper.tex").write_text(SINGLE, encoding="utf-8")
+    make_image(seed / "Plot.png")
+    repo = Repo.init(seed, initial_branch="master")
+    repo.git.add(A=True)
+    actor = Actor("Test", "test@example.com")
+    repo.index.commit("Initial", author=actor, committer=actor)
+    repo.create_remote("origin", str(remote))
+    repo.git.push("origin", "master")
+    return remote
+
+
+def test_single_file_paper_goes_to_manuscript_with_a_pointer_and_gets_a_code_folder(tmp_path, single_file_remote):
+    from core.latex_parser import find_main_tex
+
+    engine, approver = build(tmp_path, single_file_remote, SimpleNamespace(create=None))
+    engine.options = replace(engine.options, push=False)
+    try:
+        OrganizeWorkflow(engine).run()
+    finally:
+        approver.stop()
+    clone = tmp_path / "clone"
+    assert files_of(clone) == ["code/README.md", "figures/Plot.png", "manuscript/paper.tex", "paper.tex"]
+    assert (clone / "paper.tex").read_text(encoding="utf-8").rstrip().endswith(r"\input{manuscript/paper}")
+    assert r"\includegraphics{figures/Plot.png}" in (clone / "manuscript" / "paper.tex").read_text(encoding="utf-8")
+    assert find_main_tex(clone) == clone / "paper.tex"      # LaTeX still runs on the top-level pointer
+    assert not Repo(clone).is_dirty(untracked_files=True)    # all in one local commit, including code/
+
+
+def test_organising_again_changes_nothing(tmp_path, single_file_remote):
+    engine, approver = build(tmp_path, single_file_remote, SimpleNamespace(create=None))
+    engine.options = replace(engine.options, push=False)
+    try:
+        OrganizeWorkflow(engine).run()
+    finally:
+        approver.stop()
+    clone = tmp_path / "clone"
+    files = files_of(clone)
+    plan = plan_reorganisation(clone, files, "paper.tex", lambda rel: None)
+    assert plan.empty, (plan.moves, plan.created)

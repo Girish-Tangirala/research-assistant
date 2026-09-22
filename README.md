@@ -204,6 +204,12 @@ folders…**. The sidebar shows how many top-level files are not in a folder yet
   - **PDFs:** a PDF that the paper includes, or that has one page, is a figure and goes to `figures/`. A
     longer PDF (a manual, a compiled copy of the paper) is a document and goes to `notes/`.
   - Sub-folders are kept, so `sections/appendix/a.tex` becomes `manuscript/appendix/a.tex`.
+  - **A paper written as one `.tex` file** (common for papers from Overleaf or Git) moves into `manuscript/`.
+    A one-line file with the same name stays on top (`\input{manuscript/paper}`), because LaTeX and Overleaf
+    must run in the top folder, where `figures/` and `bibliography/` are. Edit the file in `manuscript/`. A
+    `main.tex` that already assembles section files stays as it is.
+  - **Every paper gets a `code/` folder** (with a short README, since Git keeps no empty folders) for the
+    scripts that produce the results.
   - Folders that are empty after the move (such as an old `images/`) are removed.
   - If the same image name exists twice (for example `SetUp.png` and `images/SetUp.png`), the one the paper
     uses keeps its name and the other becomes `SetUp-2.png`.

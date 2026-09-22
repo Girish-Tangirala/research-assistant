@@ -219,18 +219,38 @@ def insert_section(
 # ---------------------------------------------------------------------- #
 # Project structure
 # ---------------------------------------------------------------------- #
+def _tex_body(path: Path) -> str | None:
+    try:
+        return strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+    except OSError:
+        return None
+
+
 def find_main_tex(root: Path) -> Path | None:
-    """Locate the root document (the file containing ``\\documentclass``)."""
+    """Locate the root document LaTeX is run on.
+
+    That is the file with ``\\documentclass`` - or a top-level file that only ``\\input``s the
+    real document (``\\input{manuscript/paper}``, as left by File ▸ Organise), because LaTeX
+    and Overleaf must run in the top folder for the paper's relative paths to work.
+    """
     preferred = [root / "main.tex", root / "paper.tex", root / "manuscript.tex"]
-    candidates = preferred + sorted(root.rglob("*.tex"))
-    for path in candidates:
-        if not path.is_file() or ".git" in path.parts:
+    top_level = preferred + sorted(root.glob("*.tex"))
+    for path in top_level:
+        body = _tex_body(path) if path.is_file() else None
+        if body and "\\documentclass" in body:
+            return path
+    for path in top_level:  # a pointer at the top that pulls in the real document
+        body = _tex_body(path) if path.is_file() else None
+        for target in _INPUT_RE.findall(body or ""):
+            inner = root / (target.strip() if target.strip().endswith(".tex") else target.strip() + ".tex")
+            inner_body = _tex_body(inner) if inner.is_file() else None
+            if inner_body and "\\documentclass" in inner_body:
+                return path
+    for path in sorted(root.rglob("*.tex")):
+        if ".git" in path.parts or not path.is_file():
             continue
-        try:
-            head = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
-        except OSError:
-            continue
-        if "\\documentclass" in head:
+        body = _tex_body(path)
+        if body and "\\documentclass" in body:
             return path
     return None
 

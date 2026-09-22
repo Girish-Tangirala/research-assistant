@@ -409,6 +409,8 @@ class AgentEngine:
         for change in changes:  # last line of defence, also for workflow-built changes
             # For a move only the file itself must be writable: its content is not touched, and the
             # destination folder is chosen by the app, not by the model.
+            if change.placeholder and not change.abs_path.exists() and change.rel_path.endswith("README.md"):
+                continue  # the app creating a folder's README, never the model editing that folder
             for rel in ([source for source, _target in change.moves] if change.moves else [change.rel_path]):
                 self.paper.ensure_writable(rel)
         self._preview_proposed(changes)

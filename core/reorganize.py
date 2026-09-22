@@ -4,8 +4,9 @@ Files that are already in the repository are sorted into ``manuscript/``,
 ``figures/``, ``bibliography/``, ``code/``, ``notes/`` and ``data/`` (see
 :mod:`core.project_layout`), and every ``\\input``, ``\\includegraphics``,
 ``\\bibliography`` and ``\\addbibresource`` that points at a moved file is
-rewritten. Nothing is moved that LaTeX needs in place: the root document, class
-and style files, and read-only (reference-manager) files stay where they are.
+rewritten. Class and style files and read-only (reference-manager) files stay where
+they are. A paper written as a single .tex file moves into ``manuscript/`` and a one-line
+pointer stays on top, and every paper gets a ``code/`` folder.
 
 The result is a plan; the workflow turns it into one move change plus one diff
 per rewritten ``.tex`` file, so the author approves it like any other edit.
@@ -17,7 +18,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from core.latex_parser import comment_mask
+from core.latex_parser import comment_mask, strip_comments
 from core.project_layout import FOLDERS
 
 # Extension -> target folder.
@@ -56,12 +57,24 @@ class ReorgPlan:
 
     moves: list[tuple[str, str]] = field(default_factory=list)           # (from, to)
     rewrites: dict[str, str] = field(default_factory=dict)              # tex rel_path -> new content
+    created: dict[str, str] = field(default_factory=dict)               # new rel_path -> content
     kept: list[tuple[str, str]] = field(default_factory=list)           # (rel_path, why)
     warnings: list[str] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:
-        return not self.moves and not self.rewrites
+        return not self.moves and not self.rewrites and not self.created
+
+
+POINTER = """% The paper itself is in {target}.tex. This file only loads it, so that LaTeX and Overleaf
+% compile in this folder, where figures/ and bibliography/ are. Keep it here; edit the manuscript file.
+\\input{{{target}}}
+"""
+CODE_README = """# code
+
+Scripts and programs that produce the paper's results (Python, C/C++, MATLAB, R, ...), so that
+co-authors and reviewers can see how every number and figure was made.
+"""
 
 
 def _pdf_pages(path: Path) -> int:
@@ -197,10 +210,20 @@ def plan_reorganisation(root: Path, files: list[str], main_rel: str, is_protecte
                    for rel in files if rel.endswith(".tex") and (root / rel).is_file()}
     images = referenced_graphics(tex_by_file, root, main_rel)
     taken = set(files)
+    # A paper written as one .tex file: its text goes to manuscript/ and a one-line pointer stays on
+    # top (LaTeX and Overleaf must still run in the top folder). A main file that already assembles
+    # other .tex files (main.tex + sections) is left as it is.
+    single_file = ("/" not in main_rel and [f for f in files if f.endswith(".tex")] == [main_rel]
+                   and "\\documentclass" in strip_comments(tex_by_file.get(main_rel, "")))
     for rel in sorted(files):
         path = PurePosixPath(rel)
         if rel == main_rel:
-            plan.kept.append((rel, "the root document stays where LaTeX expects it"))
+            if single_file and not is_protected(rel):
+                target = _target_path(rel, "manuscript", taken)
+                plan.moves.append((rel, target))
+                plan.created[rel] = POINTER.format(target=str(PurePosixPath(target).with_suffix("")))
+            else:
+                plan.kept.append((rel, "the root document stays where LaTeX expects it"))
             continue
         reason = is_protected(rel)
         if reason:
@@ -219,6 +242,11 @@ def plan_reorganisation(root: Path, files: list[str], main_rel: str, is_protecte
         if target != rel:
             plan.moves.append((rel, target))
 
+    code_folder = root / "code"
+    has_code = (any(f.startswith("code/") for f in files) or any(t.startswith("code/") for _s, t in plan.moves)
+                or (code_folder.is_dir() and any(code_folder.iterdir())))
+    if not has_code:  # always give the paper a code/ folder (Git keeps no empty folders, hence the README)
+        plan.created["code/README.md"] = CODE_README
     mapping = dict(plan.moves)
     if not mapping:
         return plan
@@ -245,6 +273,11 @@ def plan_to_markdown(plan: ReorgPlan, name: str) -> str:
     lines += [f"| `{old}` | `{new}` |" for old, new in plan.moves]
     if plan.rewrites:
         lines += ["", "**Paths rewritten in:** " + ", ".join(f"`{rel}`" for rel in sorted(plan.rewrites))]
+    if plan.created:
+        why = {"code/README.md": "creates the code/ folder for the scripts that produce the results"}
+        lines += ["", "**New files**", "", "| File | Why |", "|---|---|"]
+        lines += [f"| `{rel}` | {why.get(rel, 'one-line main file that loads the manuscript, so LaTeX runs here')} |"
+                  for rel in plan.created]
     if plan.kept:
         lines += ["", "**Left where they are**", "", "| File | Why |", "|---|---|"]
         lines += [f"| `{rel}` | {why} |" for rel, why in plan.kept]

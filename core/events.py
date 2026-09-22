@@ -90,6 +90,9 @@ class ProposedChange:
         moves: ``(from, to)`` repo-relative pairs for files that are only moved
             (used when a paper is organised into folders). One change carries the
             whole set, so the reviewer approves the move once.
+        placeholder: A new README the app itself writes to create a folder (e.g.
+            ``code/README.md`` when organising). Allowed in folders the agent may not
+            edit, but only while the file does not exist yet.
     """
 
     repo_root: Path
@@ -102,6 +105,7 @@ class ProposedChange:
     requires: tuple[str, ...] = ()
     replaces: bool = False
     moves: tuple[tuple[str, str], ...] = ()
+    placeholder: bool = False
 
     @property
     def abs_path(self) -> Path:

@@ -343,7 +343,11 @@ class OrganizeWorkflow(BaseWorkflow):
         folders = sorted({m[1].split("/", 1)[0] for m in plan.moves})
         changes = [ProposedChange(paper.root, MOVES_LABEL, "", "",
                                   f"Move {len(plan.moves)} file(s) into {', '.join(folders)}",
-                                  moves=tuple(plan.moves))]
+                                  moves=tuple(plan.moves))] if plan.moves else []
+        after_moves = (MOVES_LABEL,) if plan.moves else ()
+        for rel, text in plan.created.items():  # the top-level pointer, code/README.md
+            changes.append(ProposedChange(paper.root, rel, "", text, f"Create {rel}", requires=after_moves,
+                                          placeholder=rel.endswith("README.md")))
         for rel, new_text in plan.rewrites.items():
             source = next((old for old, new in plan.moves if new == rel), rel)
             original = read_text(paper.root / source)
