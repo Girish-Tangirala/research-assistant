@@ -18,11 +18,13 @@ Settings, papers and sign-ins are not in the app folder, so they are kept.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
 import subprocess
 import sys
+import time
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -31,6 +33,7 @@ from pathlib import Path
 from core.dependencies import DependencyError, Installer, Progress, _get, download
 from core.proc import NO_WINDOW
 
+logger = logging.getLogger("research_agent")
 APP_EXE = "ResearchAssistant.exe"
 ASSET_RE = re.compile(r"^ResearchAssistant-windows-[\w.\-]+\.zip$")
 
@@ -102,10 +105,13 @@ def stage(release: Release, app_dir: Path, progress: Progress | None = None,
     if not os.access(parent, os.W_OK):
         raise UpdateError(f"The app's folder {parent} is not writable - move the Research Assistant folder "
                           "to e.g. Documents and update again.")
+    started = time.monotonic()
+    logger.info("Update %s: downloading %s", release.version, release.asset.url)
     try:
         archive = download(release.asset, parent / f".{app_dir.name}-download", progress, cancelled)
     except DependencyError as exc:
         raise UpdateError(str(exc)) from exc
+    logger.info("Update %s: downloaded and checked in %.1f s", release.version, time.monotonic() - started)
     staged = parent / f"{app_dir.name}.new"
     shutil.rmtree(staged, ignore_errors=True)
     unpack = parent / f".{app_dir.name}-unpack"
@@ -122,6 +128,7 @@ def stage(release: Release, app_dir: Path, progress: Progress | None = None,
     inner.rename(staged)
     shutil.rmtree(unpack, ignore_errors=True)
     shutil.rmtree(archive.parent, ignore_errors=True)
+    logger.info("Update %s: unpacked to %s after %.1f s", release.version, staged, time.monotonic() - started)
     return staged
 
 

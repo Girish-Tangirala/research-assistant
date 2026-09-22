@@ -6,6 +6,7 @@ Help ▸ Check for updates… reports every outcome.
 
 from __future__ import annotations
 
+import logging
 import webbrowser
 from collections.abc import Callable
 from tkinter import messagebox
@@ -17,6 +18,8 @@ from core.dependencies import tools_dir
 from core.updater import Release, UpdateError, check, launch_swap, running_app_dir, stage
 from gui.dialogs import MUTED, OK, _Dialog, run_in_background
 from version import UPDATE_REPO, __version__
+
+logger = logging.getLogger("research_agent")
 
 
 class UpdateDialog(_Dialog):
@@ -56,6 +59,7 @@ class UpdateDialog(_Dialog):
             self.fail(blocked)
             return
         self._running = True
+        logger.info("Update %s: 'Update now' pressed", self.release.version)
         self.busy(f"Downloading version {self.release.version}…")
         run_in_background(self, lambda: stage(self.release, self.app_dir, progress=self._on_progress),
                           self._staged, self._failed)
