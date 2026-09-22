@@ -59,6 +59,8 @@ python -m venv .venv
 - Every `subprocess.run` of a console program needs `creationflags=NO_WINDOW` (`core/proc.py`), or the
   windowless `.exe` flashes a console window.
 - GUI screenshots with PIL `ImageGrab` capture whatever is on top. Set `-topmost` on the window first.
+- Some Claude Code hook setups leave empty files named after code fragments (`None`, `str`, `1.0.0`) in the
+  project root. Check `git status` before committing and never `git add -A` blindly; the repository is public.
 
 ## Releases and updates
 
