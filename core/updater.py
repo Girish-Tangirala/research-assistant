@@ -143,11 +143,15 @@ def swap_script(app_dir: Path, staged: Path, pid: int, exe: str = APP_EXE, args:
     place, the old version stays or is put back, and it is started again.
     """
     old = app_dir.with_name(f"{app_dir.name}.old")
-    launch = f'start "" /B "%APP%\\{exe}" {args}'.rstrip()
+    # /D: the new version starts in its own folder, as when it is double-clicked.
+    launch = f'start "" /D "%APP%" /B "%APP%\\{exe}" {args}'.rstrip()
     # Plain labels and gotos (no ( ) blocks, no delayed expansion), so any folder name works.
     return "\r\n".join([
         "@echo off",
         "chcp 65001 >nul",  # the file is UTF-8: folder names like C:\Users\Jürgen stay intact
+        # Never work from inside the app folder: Windows cannot move a folder that is some
+        # process's current directory (a double-clicked app starts in its own folder).
+        'cd /d "%~dp0"',
         f'set "APP={_cmd_quote(app_dir)}"',
         f'set "NEW={_cmd_quote(staged)}"',
         f'set "OLD={_cmd_quote(old)}"',
@@ -190,5 +194,5 @@ def launch_swap(app_dir: Path, staged: Path, script_dir: Path) -> None:
     script_dir.mkdir(parents=True, exist_ok=True)
     script = script_dir / "apply-update.cmd"
     script.write_text(swap_script(app_dir, staged, os.getpid()), encoding="utf-8")
-    subprocess.Popen(["cmd.exe", "/c", str(script)],  # noqa: S603 - our own script
+    subprocess.Popen(["cmd.exe", "/c", str(script)], cwd=script_dir,  # noqa: S603 - our own script
                      creationflags=NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP, close_fds=True)

@@ -83,10 +83,10 @@ def test_swap_script_replaces_the_app_after_it_exits(tmp_path):
     assert not staged.exists() and not app.with_name("ResearchAssistant.old").exists()
     assert not (app / "papers-are-not-here.txt").exists()
     for _ in range(50):  # "start /B" returns at once; give the new app a moment
-        if (base / "started.txt").exists():
+        if (app / "started.txt").exists():
             break
         time.sleep(0.1)
-    assert (base / "started.txt").exists()
+    assert (app / "started.txt").exists()  # started in its own folder, as a double-click would
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows batch script")
@@ -113,3 +113,26 @@ def test_swap_script_waits_until_the_running_app_has_quit(tmp_path):
     assert result.returncode == 0 and running.poll() is not None
     assert time.time() - started > 2  # it waited for the process instead of swapping under it
     assert (app / "_internal" / "version.txt").read_text(encoding="utf-8") == "new"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows batch script")
+def test_swap_works_when_started_from_inside_the_app_folder(tmp_path):
+    """A double-clicked app runs in its own folder; the script must still be able to move that folder."""
+    app, staged = tmp_path / "ResearchAssistant", tmp_path / "ResearchAssistant.new"
+    make_app(app, "old")
+    make_app(staged, "new")
+    script = tmp_path / "updates" / "apply-update.cmd"
+    script.parent.mkdir()
+    script.write_text(updater.swap_script(app, staged, 999_999, args="/c exit"), encoding="utf-8")
+    result = subprocess.run(["cmd.exe", "/c", str(script)], cwd=app, capture_output=True, timeout=120)
+    assert result.returncode == 0
+    assert (app / "_internal" / "version.txt").read_text(encoding="utf-8") == "new"
+
+
+def test_launch_swap_starts_the_script_outside_the_app_folder(tmp_path, monkeypatch):
+    started = {}
+    monkeypatch.setattr(updater.subprocess, "Popen", lambda cmd, **kw: started.update(cmd=cmd, **kw))
+    app = tmp_path / "ResearchAssistant"
+    updater.launch_swap(app, tmp_path / "ResearchAssistant.new", tmp_path / "updates")
+    assert started["cwd"] == tmp_path / "updates"
+    assert "cd /d" in (tmp_path / "updates" / "apply-update.cmd").read_text(encoding="utf-8")

@@ -169,6 +169,7 @@ Your Claude key and Overleaf token are in **Windows Credential Manager** (Contro
 | Sync says there are conflicting changes | You and a co-author changed the same lines. Resolve it in Overleaf, then **Refresh**. |
 | The app closed unexpectedly | Send `C:\Users\<you>\.research_agent\crash.log` and `agent.log` to whoever maintains the app. |
 | Windows blocks the app | **More info → Run anyway** (see section 2). |
+| *Update available* keeps coming back and **Help → About** still shows the old version | Versions 1.0.0 and 1.0.1 cannot update themselves. Once only: close the app, download the newest `ResearchAssistant-windows-….zip` from the [releases page](https://github.com/Girish-Tangirala/research-assistant/releases), delete the old app folder (and any `ResearchAssistant.new` folder next to it), and unzip the new one in the same place. Your papers and settings are kept. Later updates install themselves. |
 
 ---
 
