@@ -170,6 +170,7 @@ class PapersMixin:
         """Show how many commits are waiting to go to Overleaf (counted in the background)."""
         spec = self.app_state.current
         self.publish_button.configure(state="normal" if spec else "disabled", text=self._sync_label(spec))
+        self.backup_button.configure(state="normal" if spec else "disabled")
         if spec is None:
             self.sync_status.configure(text="")
             return

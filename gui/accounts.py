@@ -45,6 +45,7 @@ class AccountsMixin:
             "OpenAlex key: set" if oa else "OpenAlex key: not set (optional)",
             [("Change key…" if oa else "Add key…", self._login_openalex, True),
              ("Remove key", self._logout_openalex, bool(oa))]))
+        sections.append(self._sharepoint_section())
         return sections
 
     def _ensure_claude(self, then: Callable[[], None], required: bool = True, reason: str = "") -> None:

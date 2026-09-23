@@ -130,7 +130,46 @@ The left panel shows how many changes are waiting. **⟳ Refresh** only fetches 
 
 If you and a co-author changed the **same lines**, nothing is sent and the app tells you. Sort it out in Overleaf, then Sync again.
 
-## 9. LaTeX errors
+## 9. Backing up your data to SharePoint
+
+Your `data\` and `supplementary\` folders never go to Overleaf, so they are the only things with no second
+copy. If your group has set this up, press **☁ Back up data** (left panel) to copy them to SharePoint.
+
+The app shows you what has changed and asks before sending anything, then a window with a progress bar
+tells you which file it is on (*"File 5 of 10 · 3.8 MB of 19.1 MB"*). **Cancel** stops it after the current
+file; what has already gone is remembered, so nothing is sent twice when you run it again.
+
+Your files land there in the same structure you see here:
+
+```
+<your group's folder>\<paper name>\data\...
+<your group's folder>\<paper name>\supplementary\...
+```
+
+- It only ever **uploads**. Nothing in SharePoint is renamed or deleted, and nothing is downloaded, so
+  running it again is always safe.
+- Only files that are **new or changed** are sent, so later backups are quick.
+- SharePoint refuses some file names (anything with `: * ? " < > |`, names like `CON.txt`, and very long
+  paths). Those files are listed in the log and skipped — everything else still goes.
+
+**Setting it up the first time.** The button opens a window with two choices:
+
+**Folder synced by OneDrive** *(the simple one — use this unless told otherwise)*
+
+1. Open the SharePoint library in your browser and press **Sync**. Windows asks to open the OneDrive app;
+   allow it. OneDrive then makes a folder on your computer, something like
+   `C:\Users\<you>\Technische Hochschule Ingolstadt\<Team> - Documents`.
+2. In the app, press **☁ Back up data → …** and pick that folder. If it is not a folder OneDrive syncs, the
+   app says so and lists the folders that are — so you can't quietly copy into a dead end.
+3. That's it — no sign-in, no codes. The app copies your files in and OneDrive uploads them. The green ticks
+   in Explorer tell you when they have arrived.
+
+**Microsoft Graph** *(only if your IT department has given you an app registration)*
+
+Type the *Application (client) ID*, *tenant ID* and site address they give you, then sign in with the short
+code the app shows in a browser. The app then uploads to SharePoint directly and confirms every file itself.
+
+## 10. LaTeX errors
 
 Like Overleaf, the app keeps building the PDF when LaTeX can recover from an error. In that case:
 
@@ -141,7 +180,7 @@ Only a serious error (for example a missing file) stops the PDF. The label turns
 
 When the AI changes your paper, it is only rolled back if it **adds a new** error. Errors that were already there don't block it.
 
-## 10. Where your files are
+## 11. Where your files are
 
 Everything is in the folder **`C:\Users\<you>\.research_agent`**:
 
@@ -153,12 +192,13 @@ Everything is in the folder **`C:\Users\<you>\.research_agent`**:
 | `reports\` | literature reviews, audits, `.bib` exports |
 | `agent.log` | the detailed log (useful when reporting a problem) |
 | `app_state.json` | your paper list and settings (no passwords) |
+| `sharepoint\` | a note of which files were last backed up, so only changes are re-sent |
 
-Your Claude key and Overleaf token are in **Windows Credential Manager** (Control Panel → Credential Manager → Windows Credentials).
+Your Claude key, Overleaf token and SharePoint sign-in are in **Windows Credential Manager** (Control Panel → Credential Manager → Windows Credentials).
 
-**What is sent where:** for AI tasks, the text the task needs (for example one section) goes to Anthropic's Claude API. Editing, the PDF and the history stay on your computer, and Sync talks only to Overleaf.
+**What is sent where:** for AI tasks, the text the task needs (for example one section) goes to Anthropic's Claude API. Editing, the PDF and the history stay on your computer; Sync talks only to Overleaf, and Back up data only to your organisation's SharePoint.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Problem | What to do |
 |---|---|

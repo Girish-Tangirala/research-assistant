@@ -29,9 +29,20 @@ python -m venv .venv
   every step can be gated and cancelled. Default model `claude-opus-5`, set in `config.py`.
 - **Approval first:** the agent never writes a file without the diff window. Nothing is pushed except by
   the Sync button (`PublishWorkflow`). Commits are local first.
-- **Secrets only in the OS vault** (`keyring` → Windows Credential Manager): the Claude key, Git tokens and
-  OpenAlex key. Never in `.env`, `.git/config`, logs or the build. Git tokens go per command via
-  `GIT_CONFIG_*` env vars. Each user signs in with their **own** Claude API key.
+- **Secrets only in the OS vault** (`keyring` → Windows Credential Manager): the Claude key, Git tokens,
+  the OpenAlex key and the SharePoint refresh token. Never in `.env`, `.git/config`, logs or the build. Git
+  tokens go per command via `GIT_CONFIG_*` env vars. Each user signs in with their **own** Claude API key.
+- **SharePoint is upload-only and button-gated** (`core/sharepoint*.py`): the ☁ Back up data button mirrors
+  `data/` and `supplementary/` into a library and never downloads, renames or deletes there. Two routes
+  behind one interface (`index`/`ensure_folder`/`upload`), so `sharepoint_sync.py` knows about neither:
+  a OneDrive-synced folder (the **default** — THI blocks `portal.azure.com` for non-admins, so an app
+  registration is not available to the users) and Microsoft Graph. Graph uses stdlib `urllib` only (no
+  `msal`/`requests`) and is a public client, so no client secret exists anywhere. What to re-send is decided
+  from a local manifest in `workspace/sharepoint/`, never by comparing against the server's clock.
+  `core/onedrive.py` reads OneDrive's real sync roots from `HKCU\Software\Microsoft\OneDrive\Accounts` to
+  warn (never refuse) about a folder OneDrive does not watch; registry values there can hold unexpanded
+  `%UserProfile%`. In a Tk `Toplevel`, never name an attribute `state` — it shadows `Toplevel.state()` and
+  CustomTkinter's DPI tracker calls it.
 - **The agent touches only the paper folder**, never `data/`, `supplementary/` or `code/` (`project_layout.PROTECTED_FOLDERS`), never reference-manager `.bib`
   files (`core/protection.py`), and never `todo.md`. Files the user picks come in through file pickers.
 - **Checkable literature:** only papers returned by the search tools, each with its DOI/URL; never invent

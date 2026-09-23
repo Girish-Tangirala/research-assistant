@@ -46,6 +46,7 @@ from gui.panels import TaskPanel, open_path
 from gui.papers import NO_PAPER, PapersMixin
 from gui.pdf_links import PdfLinkMixin
 from gui.preview_pane import PreviewMixin
+from gui.sharepoint import SharePointMixin
 from gui.todo_panel import TodoContext
 
 logger = logging.getLogger("research_agent")
@@ -55,7 +56,7 @@ WRAP = SIDEBAR_WIDTH - 34   # labels sit inside a padded frame
 
 
 class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixin, EditorMixin, UpdateMixin,
-                           ctk.CTk):
+                           SharePointMixin, ctk.CTk):
     """Main application window."""
 
     def __init__(self, config: AppConfig, store: CredentialStore | None = None) -> None:
@@ -136,6 +137,9 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
         self.publish_button = ctk.CTkButton(paper, text="⇄  Sync with Overleaf", font=small,
                                             command=self._sync_with_overleaf)
         self.publish_button.pack(fill="x", padx=10, pady=(2, 4))
+        self.backup_button = ctk.CTkButton(paper, text="☁  Back up data", font=small, fg_color="transparent",
+                                           border_width=1, command=self._backup_to_sharepoint)
+        self.backup_button.pack(fill="x", padx=10, pady=(0, 4))
         bottom = ctk.CTkFrame(paper, fg_color="transparent")
         bottom.pack(fill="x", padx=10, pady=(0, 10))
         self.sync_button = ctk.CTkButton(bottom, text="⟳ Refresh", width=10, font=small, fg_color="transparent",
@@ -158,6 +162,7 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
                 add_paper=self._add_paper, edit_paper=self._edit_paper, remove_paper=self._remove_paper,
                 sync_paper=lambda: self._start(SyncWorkflow, {}),
                 publish_paper=self._sync_with_overleaf,
+                backup_data=self._backup_to_sharepoint,
                 open_folder=self._open_paper_folder,
                 organise_paper=self._organise_paper,
                 open_reports=lambda: open_path(self.config_.reports_dir),
@@ -277,6 +282,7 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
         self.panel.set_running(True)
         self.sync_button.configure(state="disabled")
         self.publish_button.configure(state="disabled")
+        self.backup_button.configure(state="disabled")
         self.panel.append(EventKind.STATE, f"▶ {workflow_cls.name} - {spec.name}")
         self.worker = threading.Thread(target=self._worker, args=(workflow_cls, params, engine),
                                        daemon=True, name="agent-worker")

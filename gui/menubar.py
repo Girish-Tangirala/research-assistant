@@ -18,6 +18,8 @@ HELP_LINKS = (
     ("Create a GitHub fine-grained token", "https://github.com/settings/personal-access-tokens"),
     ("Create a Claude API key", "https://console.anthropic.com/settings/keys"),
     ("Get an OpenAlex API key", "https://openalex.org/settings/api"),
+    ("Register the app for SharePoint (Azure portal)",
+     "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
 )
 
 
@@ -36,6 +38,7 @@ class MenuActions:
     remove_paper: Callable[[], None]
     sync_paper: Callable[[], None]
     publish_paper: Callable[[], None]
+    backup_data: Callable[[], None]
     open_folder: Callable[[], None]
     organise_paper: Callable[[], None]
     open_reports: Callable[[], None]
@@ -68,6 +71,7 @@ class AppMenuBar:
         file_menu.add_command(label="Refresh paper", command=actions.sync_paper, accelerator="F5")
         file_menu.add_command(label="Sync with Overleaf…", command=actions.publish_paper,
                               accelerator="Ctrl+Shift+S")
+        file_menu.add_command(label="Back up data to SharePoint…", command=actions.backup_data)
         file_menu.add_separator()
         file_menu.add_command(label="Organise paper into folders…", command=actions.organise_paper)
         file_menu.add_separator()

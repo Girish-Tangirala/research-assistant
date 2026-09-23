@@ -32,6 +32,72 @@ def normalize_remote_url(url: str) -> str:
     return url.rstrip("/")
 
 
+SHAREPOINT_MODES = ("folder", "graph")
+
+
+@dataclass
+class SharePointSettings:
+    """Where the local-only folders are backed up (no secrets: the token is in the vault).
+
+    Two ways to reach SharePoint:
+
+    ``folder``
+        Copy into a library the OneDrive client already syncs to a folder on this
+        computer, which OneDrive then uploads. Needs nothing set up centrally.
+    ``graph``
+        Upload straight to the library through Microsoft Graph. Needs an Azure app
+        registration (``client_id``/``tenant``), which many universities only let
+        their IT department create.
+    """
+
+    mode: str = "folder"
+    local_library: str = ""            # folder mode: the OneDrive-synced library folder
+    client_id: str = ""                # graph mode: from the Azure app registration
+    tenant: str = "organizations"
+    site_url: str = ""
+    library: str = ""                  # blank = the site's default 'Documents' library
+    root_folder: str = "Research papers"
+    folders: str = "data, supplementary"
+    account: str = ""                  # display only: who signed in last
+
+    @property
+    def uses_graph(self) -> bool:
+        return self.mode == "graph"
+
+    @property
+    def configured(self) -> bool:
+        if self.uses_graph:
+            return bool(self.client_id.strip() and self.site_url.strip())
+        return bool(self.local_library.strip())
+
+    @property
+    def folder_list(self) -> list[str]:
+        return [f.strip().strip("/") for f in self.folders.split(",") if f.strip().strip("/")]
+
+
+def validate_sharepoint(settings: SharePointSettings) -> list[str]:
+    """Human-readable problems with the SharePoint settings (empty list = OK)."""
+    problems: list[str] = []
+    if settings.mode not in SHAREPOINT_MODES:
+        problems.append("Choose how the app should reach SharePoint.")
+    elif settings.uses_graph:
+        if not settings.client_id.strip():
+            problems.append("Enter the application (client) ID from the Azure app registration.")
+        if not settings.site_url.strip():
+            problems.append("Enter the address of the SharePoint site.")
+        elif not re.match(r"^(https?://)?[\w.-]+\.\w+", settings.site_url.strip()):
+            problems.append("The site address should look like https://yourcompany.sharepoint.com/sites/Team.")
+    elif not settings.local_library.strip():
+        problems.append("Choose the folder that OneDrive syncs with the SharePoint library.")
+    elif not Path(settings.local_library).expanduser().is_dir():
+        problems.append(f"{settings.local_library} is not a folder on this computer.")
+    if not settings.folder_list:
+        problems.append("Choose at least one folder to back up.")
+    if not settings.root_folder.strip():
+        problems.append("Enter the folder in SharePoint the papers go into.")
+    return problems
+
+
 @dataclass
 class PaperSpec:
     """One LaTeX paper (a Git repository) the user works on."""
@@ -84,6 +150,16 @@ def _paper_from_json(data: dict) -> PaperSpec:
     return PaperSpec(**values)
 
 
+def _sharepoint_from_json(data: object) -> SharePointSettings:
+    if not isinstance(data, dict):
+        return SharePointSettings()
+    fields = SharePointSettings.__dataclass_fields__
+    settings = SharePointSettings(**{k: str(v) for k, v in data.items() if k in fields})
+    if settings.mode not in SHAREPOINT_MODES:
+        settings.mode = "folder"
+    return settings
+
+
 def default_local_path(papers_dir: Path, name: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", name).strip("-").lower() or "paper"
     return str(papers_dir / slug)
@@ -102,6 +178,7 @@ class AppState:
     show_preview: bool = True
     author_name: str = ""
     author_email: str = ""
+    sharepoint: SharePointSettings = field(default_factory=SharePointSettings)
 
     # -- papers ------------------------------------------------------------ #
     @property
@@ -153,6 +230,7 @@ class AppState:
             show_preview=bool(data.get("show_preview", True)),
             author_name=str(data.get("author_name", "")),
             author_email=str(data.get("author_email", "")),
+            sharepoint=_sharepoint_from_json(data.get("sharepoint")),
         )
 
     def save(self, path: Path) -> None:

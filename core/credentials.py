@@ -11,6 +11,7 @@ Stored items (service name ``ScientificResearchAssistant``):
 * ``git:<host>``       – JSON ``{"username", "token"}`` per Git host.
 * ``git_hosts``        – JSON list of hosts with stored Git credentials.
 * ``openalex_api_key`` – optional OpenAlex key (raises the daily search budget).
+* ``sharepoint_token`` – OAuth refresh token for the SharePoint backup.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ SERVICE = "ScientificResearchAssistant"
 CLAUDE_KEY = "claude_api_key"
 OPENALEX_KEY = "openalex_api_key"
 GIT_HOSTS_KEY = "git_hosts"
+SHAREPOINT_KEY = "sharepoint_token"
 
 DEFAULT_GIT_USERNAMES = {
     "git.overleaf.com": "git",
@@ -154,6 +156,16 @@ class CredentialStore:
 
     def clear_openalex_key(self) -> None:
         self._delete(OPENALEX_KEY)
+
+    # -- SharePoint (optional backup of data/) --------------------------- #
+    def get_sharepoint_token(self) -> str | None:
+        return self._get(SHAREPOINT_KEY) or None
+
+    def set_sharepoint_token(self, token: str) -> None:
+        self._set(SHAREPOINT_KEY, token.strip())
+
+    def clear_sharepoint_token(self) -> None:
+        self._delete(SHAREPOINT_KEY)
 
     # -- Git --------------------------------------------------------------- #
     def git_hosts(self) -> list[str]:

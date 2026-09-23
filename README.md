@@ -257,6 +257,55 @@ The sidebar says how much is waiting, e.g. *"3 change(s) to send"*. **⟳ Refres
 - **Immediate pushing:** if you prefer the old behaviour, tick **Options → Send to Overleaf right after each
   approval**.
 
+### Back up data/ to SharePoint
+
+`data/` and `supplementary/` never go to Overleaf, so they are the two folders with no copy anywhere else.
+The **☁ Back up data** button (File → Back up data to SharePoint…) copies them into a SharePoint document
+library, keeping the same structure:
+
+```
+<folder in the library>/<paper name>/data/...
+<folder in the library>/<paper name>/supplementary/...
+```
+
+- **Uploads only.** Nothing is downloaded, renamed or deleted in SharePoint. A file you delete here stays
+  there, so the backup can never lose work.
+- **Only when you press the button**, like Sync. It first lists what changed and asks before sending
+  anything, then shows a progress window (file *n* of *m*, MB sent of MB total, the file in flight) with a
+  **Cancel** that stops after the current file. What already went is recorded, so cancelling costs nothing.
+- **Only what changed** is sent: a file is uploaded when it is new, when its size differs, or when it was
+  edited here since the last backup (compared against a small record in `~/.research_agent/sharepoint/`,
+  never against the server's clock).
+- **Each person signs in with their own Microsoft account** and only sees the sites they already have access
+  to. Just the sign-in token is kept, in the Windows Credential Manager.
+- **Large files** go up in 10 MB chunks with a resumable upload session.
+- **Names SharePoint refuses** (`a:b.csv`, `CON.txt`, a path over 400 characters) are listed in the log and
+  skipped; the rest still go. A single rejected file never stops the run.
+
+There are two ways to reach the library, chosen in **Accounts → SharePoint → Set up…**. Everything above is
+true of both; only the last step differs.
+
+**Folder synced by OneDrive (the default — nothing to set up centrally).** Open the library in your browser,
+press **Sync**, and OneDrive makes a folder on your computer (e.g. `…\Your University\Team - Documents`).
+Point the app at that folder and it copies into it; OneDrive uploads from there and its icons show the
+progress. Files are copied via a temporary name and then renamed, so OneDrive never uploads half a file.
+The trade-off: the app hands off to OneDrive and cannot itself confirm a file reached SharePoint.
+
+The chosen folder is checked against OneDrive's **real** sync roots, read from
+`HKCU\Software\Microsoft\OneDrive\Accounts` (`core/onedrive.py`) — the OneDrive folder of each signed-in
+account plus every synced SharePoint library. Picking a folder outside them, or running with OneDrive closed,
+gets a warning naming the folders that *are* synced. It warns rather than refuses, because OneDrive can be
+set up in ways the registry does not show.
+
+**Microsoft Graph (uploads directly, needs an Azure app registration).** In the Azure portal →
+*App registrations* → *New registration*: name it, choose *Accounts in this organizational directory only*,
+and register. On the app's **Authentication** page turn on *Allow public client flows*; on **API permissions**
+add the Microsoft Graph **delegated** permissions `Sites.ReadWrite.All`, `User.Read` and `offline_access`.
+Copy the *Application (client) ID* and *Directory (tenant) ID* into the settings along with the site address,
+then sign in with the short code the app shows. No client secret is ever needed or stored — the app is a
+public client. Many universities only let their IT department open that portal, which is why the folder
+route is the default.
+
 ### Overleaf (premium)
 
 Overleaf's Git integration is a premium feature, and it's enough if either the project owner or you has a premium plan.
@@ -313,6 +362,10 @@ core/
   reorganize.py         → sort an existing paper into those folders, rewriting LaTeX paths
   git_sync.py           → the Sync button: fetch, counts, replay local commits, push
   git_errors.py         → Git error types shared by the two Git modules
+  sharepoint.py         → Microsoft Graph over stdlib HTTP: device-code sign-in, library, upload
+  sharepoint_folder.py  → the same, into a library OneDrive already syncs to a folder (no sign-in)
+  sharepoint_sync.py    → the data backup: what changed, mirrored folders, manifest, per-file failures
+  onedrive.py           → OneDrive's sync roots from the registry: is this folder really synced?
   preview.py            → preview builds (current / proposed / approved), changed-page detection, image hit test
   synctex.py            → SyncTeX reader: PDF position → source file and line
   source_map.py         → what a click hit: section, figure, table, equation, citations; figure lookup
@@ -326,6 +379,7 @@ gui/
   task_forms.py         → one parameter form per tab (file pickers, section pickers)
   todo_panel.py         → the To-Do tab (filters, add/edit/tick/delete, auto-refresh)
   accounts.py           → sign-in handling (Accounts menu, sign-in prompts)
+  sharepoint.py         → SharePoint settings + device-code sign-in dialogs, the Back up data action
   preview_pane.py       → PDF preview pane, push confirmation, recompile/auto-recompile glue
   pdf_view.py           → lazy, threaded PDF page renderer on a Tk canvas (click / hover)
   pdf_links.py          → click-to-edit: background source lookup, editor / tab pre-filling, right-click menu
