@@ -5,5 +5,5 @@
 release at start-up (``core/updater.py``).
 """
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 UPDATE_REPO = "Girish-Tangirala/research-assistant"   # owner/name on github.com
