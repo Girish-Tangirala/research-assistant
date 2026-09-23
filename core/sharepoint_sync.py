@@ -79,7 +79,7 @@ def remote_base(root_folder: str, paper_name: str) -> str:
 
 def _manifest_path(workspace: Path, paper_name: str) -> Path:
     safe = "".join(c if c.isalnum() or c in "-_ " else "_" for c in paper_name).strip() or "paper"
-    return workspace / "sharepoint" / f"{safe}.json"
+    return workspace / "backup" / f"{safe}.json"
 
 
 def load_manifest(workspace: Path, paper_name: str) -> dict[str, list[int]]:

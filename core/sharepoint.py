@@ -263,7 +263,7 @@ def name_problem(name: str) -> str | None:
     if name.lower() in RESERVED or name.split(".")[0].lower() in RESERVED:
         return f"{name!r} is a name Windows reserves"
     if name.startswith("~$") or name == ".lock" or "_vti_" in name.lower():
-        return "SharePoint reserves this name"
+        return "this name is reserved"
     return None
 
 
@@ -274,7 +274,7 @@ def path_problem(relative_path: str) -> str | None:
         if problem:
             return problem
     if len(relative_path) > MAX_PATH:
-        return "the path is too long for SharePoint (over 400 characters)"
+        return "the path is too long (over 400 characters)"
     return None
 
 
@@ -316,7 +316,7 @@ class SharePointClient:
             raise SharePointAuthError("Microsoft 365 rejected the sign-in - sign in again.")
         if status == 403:
             raise SharePointError("Your account is not allowed to use this site. Ask whoever owns the "
-                                  "SharePoint site to give you Edit access.")
+                                  "library to give you Edit access.")
         if status >= 400:
             raise SharePointError(_graph_error(status, payload))
         return _decode(payload)
@@ -367,7 +367,7 @@ class SharePointClient:
             if status == 401:
                 raise SharePointAuthError("Microsoft 365 rejected the sign-in - sign in again.")
             raise SharePointError(f"Could not create the folder {'/'.join(parts[:depth + 1])!r} in "
-                                  f"SharePoint.\n{_graph_error(status, payload)}")
+                                  f"the library.\n{_graph_error(status, payload)}")
 
     def index(self, path: str) -> dict[str, RemoteFile]:
         """Every file at or below ``path``, keyed by path relative to it.

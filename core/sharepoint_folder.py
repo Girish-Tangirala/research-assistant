@@ -34,8 +34,8 @@ class LocalLibraryClient:
         """Fail early with something the user can act on."""
         if not self.root.exists():
             raise SharePointError(
-                f"{self.root} does not exist. Open OneDrive, make sure the SharePoint library is synced "
-                "to this computer, then pick that folder again.")
+                f"{self.root} does not exist. Open OneDrive, make sure that folder is synced to this "
+                "computer, then choose it again.")
         if not self.root.is_dir():
             raise SharePointError(f"{self.root} is a file, not a folder.")
         if not os.access(self.root, os.W_OK):

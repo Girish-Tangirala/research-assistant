@@ -79,22 +79,22 @@ def validate_sharepoint(settings: SharePointSettings) -> list[str]:
     """Human-readable problems with the SharePoint settings (empty list = OK)."""
     problems: list[str] = []
     if settings.mode not in SHAREPOINT_MODES:
-        problems.append("Choose how the app should reach SharePoint.")
+        problems.append("Choose how the app should back up your data.")
     elif settings.uses_graph:
         if not settings.client_id.strip():
             problems.append("Enter the application (client) ID from the Azure app registration.")
         if not settings.site_url.strip():
-            problems.append("Enter the address of the SharePoint site.")
+            problems.append("Enter the address of the site.")
         elif not re.match(r"^(https?://)?[\w.-]+\.\w+", settings.site_url.strip()):
-            problems.append("The site address should look like https://yourcompany.sharepoint.com/sites/Team.")
+            problems.append("The site address should look like https://yourcompany.example.com/sites/Team.")
     elif not settings.local_library.strip():
-        problems.append("Choose the folder that OneDrive syncs with the SharePoint library.")
+        problems.append("Choose the folder that OneDrive syncs to this computer.")
     elif not Path(settings.local_library).expanduser().is_dir():
         problems.append(f"{settings.local_library} is not a folder on this computer.")
     if not settings.folder_list:
         problems.append("Choose at least one folder to back up.")
     if not settings.root_folder.strip():
-        problems.append("Enter the folder in SharePoint the papers go into.")
+        problems.append("Enter the folder the papers go into.")
     return problems
 
 

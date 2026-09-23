@@ -5,6 +5,7 @@ No network: :func:`core.sharepoint._http` is replaced with a table of canned rep
 
 from __future__ import annotations
 
+import ast
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -292,7 +293,7 @@ def test_plan_marks_new_changed_and_unchanged(paper):
     assert by_path["supplementary/video.mp4"].remote_path == "Papers/P1/supplementary/video.mp4"
 
 
-def test_plan_skips_names_sharepoint_refuses(tmp_path):
+def test_plan_skips_names_that_are_not_allowed(tmp_path):
     root = tmp_path / "paper"
     (root / "data").mkdir(parents=True)
     (root / "data" / "CON.txt").write_bytes(b"x")
@@ -634,6 +635,47 @@ def test_folder_settings_need_a_real_folder(tmp_path):
     missing = validate_sharepoint(SharePointSettings(local_library=str(tmp_path / "nope")))
     assert any("not a folder" in p for p in missing)
     assert not validate_sharepoint(SharePointSettings(local_library=str(tmp_path)))
+
+
+# ---------------------------------------------------------------------- #
+# Nothing the user can read says "SharePoint"
+# ---------------------------------------------------------------------- #
+# The word is kept out of the interface while the Graph route is hidden: the group has no
+# SharePoint library, so it would only confuse. These are the modules whose strings can
+# reach a user through the OneDrive route; core/sharepoint.py is Graph-only and unreachable.
+USER_FACING = ("gui", "core/onedrive.py", "core/sharepoint_folder.py", "core/sharepoint_sync.py",
+               "core/app_state.py")
+# Internal identifiers, never shown as prose: a settings key and a credential-vault key.
+ALLOWED = {"sharepoint", "sharepoint_token"}
+
+
+def _visible_strings(path: Path):
+    """Every string literal in ``path`` that is not a docstring, with its line number."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    docstrings = {doc for node in ast.walk(tree)
+                  if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                  and (doc := ast.get_docstring(node, clean=False))}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value not in docstrings:
+            yield node.lineno, node.value
+
+
+def test_no_user_visible_string_mentions_sharepoint():
+    root = Path(__file__).resolve().parents[1]
+    offenders = []
+    for entry in USER_FACING:
+        target = root / entry
+        for path in (sorted(target.rglob("*.py")) if target.is_dir() else [target]):
+            for line, value in _visible_strings(path):
+                if "sharepoint" in value.lower() and value.strip().lower() not in ALLOWED:
+                    offenders.append(f"{path.relative_to(root)}:{line}: {value.strip()[:70]}")
+    assert not offenders, "user-visible text still says SharePoint:\n" + "\n".join(offenders)
+
+
+def test_the_graph_route_is_still_intact_behind_the_scenes():
+    """Hidden, not deleted - it comes back when a library and an app registration exist."""
+    assert SharePointSettings(mode="graph", client_id="c", site_url="https://x/sites/y").uses_graph
+    assert callable(sp.start_device_code) and callable(sp.SharePointClient.upload)
 
 
 def test_token_is_stored_in_the_vault():

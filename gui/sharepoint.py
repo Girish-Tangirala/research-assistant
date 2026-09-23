@@ -1,7 +1,12 @@
-"""SharePoint backup: settings, sign-in and the 'Back up data' action.
+"""Data backup: settings, sign-in and the 'Back up data' action.
 
 Mixed into :class:`gui.app.ResearchAssistantApp`. The backup is one-way and only
 ever runs when the user presses the button, like Sync with Overleaf.
+
+Only the OneDrive-folder route is offered in the interface. The Microsoft Graph
+route (``mode="graph"``) is built and tested but not reachable here: nobody in the
+group has a SharePoint library or an Azure app registration yet, so offering it
+would only confuse. Put the mode switch back when that changes.
 """
 
 from __future__ import annotations
@@ -9,6 +14,7 @@ from __future__ import annotations
 import threading
 import webbrowser
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Any
@@ -30,101 +36,51 @@ from core.sharepoint_sync import (
 from gui.dialogs import MUTED, OK, _Dialog, run_in_background
 from gui.menubar import AccountSection
 
-REGISTRATION_URL = "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"
-
-
-FOLDER_MODE = "Folder synced by OneDrive"
-GRAPH_MODE = "Microsoft Graph (needs an app registration)"
-
-
 class SharePointSettingsDialog(_Dialog):
-    """Where the backup goes, and which of the two routes reaches it."""
+    """Which OneDrive folder the backup copies into, and what it takes with it."""
 
     def __init__(self, master: Any, settings: SharePointSettings,
                  on_save: Callable[[SharePointSettings], None]) -> None:
-        super().__init__(master, "SharePoint backup", "Back up data to SharePoint",
-                         "Copies the folders that never go to Overleaf (data/, supplementary/) into a "
-                         "SharePoint library, keeping the same structure. Uploads only: nothing in "
-                         "SharePoint is renamed or deleted.")
-        self.on_save = on_save
-        self.mode = ctk.CTkSegmentedButton(self.body, values=[FOLDER_MODE, GRAPH_MODE],
-                                           command=lambda _v: self._toggle())
-        self.mode.set(GRAPH_MODE if settings.uses_graph else FOLDER_MODE)
-        self.mode.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
-        self._row += 1
-
-        self._folder_block = self._block(lambda: self._build_folder(settings))
-        self._graph_block = self._block(lambda: self._build_graph(settings))
-        self.root_folder = self.entry("Folder in the library", settings.root_folder,
-                                      placeholder="Research papers")
-        self.folders = self.entry("Folders of each paper to back up", settings.folders,
-                                  placeholder="data, supplementary")
-        self.finish_layout("Save", self.submit)
-        self._toggle()
-
-    def _block(self, build: Callable[[], None]) -> list[Any]:
-        """Run ``build`` and collect what it added, so the group can be shown or hidden together."""
-        before = set(self.body.grid_slaves())
-        build()
-        return [w for w in self.body.grid_slaves() if w not in before]
-
-    def _build_folder(self, settings: SharePointSettings) -> None:
-        self.label("Sync the SharePoint library with the OneDrive app first (open the library in your "
-                   "browser and press Sync), then choose the folder it created.", color=MUTED)
-        self.label("Folder on this computer that OneDrive syncs with the library")
+        super().__init__(master, "Back up data", "Back up data to OneDrive",
+                         "Copies the folders that never go to Overleaf (data/, supplementary/) into "
+                         "OneDrive, keeping the same structure, so they have a second copy. Uploads "
+                         "only: nothing already in OneDrive is renamed or deleted.")
+        self.on_save, self.settings = on_save, settings
+        self.label("OneDrive then uploads them by itself. The tick marks in Explorer show when a file "
+                   "has arrived.", color=MUTED)
+        self.label("Folder on this computer that OneDrive syncs")
         row = ctk.CTkFrame(self.body, fg_color="transparent")
         row.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
-        self.local_library = ctk.CTkEntry(
-            row, placeholder_text=r"C:\Users\you\Your University\Team Name - Documents")
+        self.local_library = ctk.CTkEntry(row, placeholder_text=r"C:\Users\you\OneDrive - Your University")
         self.local_library.pack(side="left", fill="x", expand=True)
         if settings.local_library:
             self.local_library.insert(0, settings.local_library)
         ctk.CTkButton(row, text="…", width=32, command=self._browse).pack(side="left", padx=(4, 0))
-
-    def _build_graph(self, settings: SharePointSettings) -> None:
-        self.link("Register the app once in the Azure portal →", REGISTRATION_URL)
-        self.label("Many universities only let their IT department open this portal. If it refuses you, "
-                   "use the folder route instead.", color=MUTED)
-        self.client_id = self.entry("Application (client) ID", settings.client_id,
-                                    placeholder="00000000-0000-0000-0000-000000000000")
-        self.tenant = self.entry("Directory (tenant) ID", settings.tenant,
-                                 placeholder="organizations = any work account")
-        self.site_url = self.entry("SharePoint site", settings.site_url,
-                                   placeholder="https://yourcompany.sharepoint.com/sites/YourTeam")
-        self.library = self.entry("Document library (optional)", settings.library,
-                                  placeholder="blank = Documents")
-
-    def _toggle(self) -> None:
-        graph = self.mode.get() == GRAPH_MODE
-        for widget in self._graph_block:
-            widget.grid() if graph else widget.grid_remove()
-        for widget in self._folder_block:
-            widget.grid_remove() if graph else widget.grid()
+        self.root_folder = self.entry("Folder inside it for the papers", settings.root_folder,
+                                      placeholder="Research papers")
+        self.folders = self.entry("Folders of each paper to back up", settings.folders,
+                                  placeholder="data, supplementary")
+        self.finish_layout("Save", self.submit)
 
     def _browse(self) -> None:
-        chosen = filedialog.askdirectory(parent=self, title="Choose the synced SharePoint library folder",
+        chosen = filedialog.askdirectory(parent=self, title="Choose the OneDrive folder to back up into",
                                          initialdir=self.local_library.get() or str(Path.home()))
         if chosen:
             self.local_library.delete(0, "end")
             self.local_library.insert(0, chosen)
 
     def submit(self) -> None:
-        settings = SharePointSettings(
-            mode="graph" if self.mode.get() == GRAPH_MODE else "folder",
-            local_library=self.local_library.get().strip(),
-            client_id=self.client_id.get().strip(),
-            tenant=self.tenant.get().strip() or "organizations",
-            site_url=self.site_url.get().strip(),
-            library=self.library.get().strip(),
-            root_folder=self.root_folder.get().strip(),
-            folders=self.folders.get().strip(),
-        )
+        # Any Graph settings entered by an earlier version are kept, just not used.
+        settings = replace(self.settings, mode="folder",
+                           local_library=self.local_library.get().strip(),
+                           root_folder=self.root_folder.get().strip(),
+                           folders=self.folders.get().strip())
         problems = validate_sharepoint(settings)
         if problems:
             self.fail("\n".join(problems))
             return
-        problem = None if settings.uses_graph else folder_problem(Path(settings.local_library))
+        problem = folder_problem(Path(settings.local_library))
         if problem and not messagebox.askyesno("Check the folder", f"{problem}\n\nUse it anyway?",
                                                parent=self):
             return
@@ -137,7 +93,7 @@ class SharePointSignInDialog(_Dialog):
 
     def __init__(self, master: Any, store: CredentialStore, settings: SharePointSettings,
                  on_done: Callable[[str], None]) -> None:
-        super().__init__(master, "Sign in to SharePoint", "Sign in to Microsoft 365",
+        super().__init__(master, "Sign in", "Sign in to Microsoft 365",
                          "A browser page will ask for the code below. Only a sign-in token is stored, "
                          "in the system credential vault - never your password.")
         self.store, self.settings, self.on_done = store, settings, on_done
@@ -205,7 +161,7 @@ class BackupProgressWindow(ctk.CTkToplevel):
 
     def __init__(self, master: Any, paper: str, files: int, total_bytes: int, handing_off: bool) -> None:
         super().__init__(master)
-        self.title("Backing up to SharePoint")
+        self.title("Backing up data")
         self.resizable(False, False)
         self.transient(master)
         self.cancelled = threading.Event()
@@ -227,8 +183,8 @@ class BackupProgressWindow(ctk.CTkToplevel):
                                     justify="left", font=ctk.CTkFont(size=11))
         self.current.pack(fill="x", pady=(6, 0))
         if handing_off:
-            ctk.CTkLabel(body, text="OneDrive uploads them to SharePoint afterwards; watch the tick marks "
-                                    "in Explorer.", text_color=MUTED, anchor="w", wraplength=430,
+            ctk.CTkLabel(body, text="OneDrive uploads them afterwards; watch the tick marks in "
+                                    "Explorer.", text_color=MUTED, anchor="w", wraplength=430,
                          justify="left", font=ctk.CTkFont(size=11)).pack(fill="x", pady=(6, 0))
         self.button = ctk.CTkButton(body, text="Cancel", width=110, fg_color="transparent", border_width=1,
                                     command=self._stop)
@@ -269,7 +225,7 @@ class BackupProgressWindow(ctk.CTkToplevel):
 
 
 class SharePointMixin:
-    """The SharePoint entries of the Accounts menu and the backup action."""
+    """The backup entries of the Accounts menu and the Back up data action."""
 
     _sharepoint_busy = False
 
@@ -283,7 +239,7 @@ class SharePointMixin:
             self.app_state.sharepoint = settings
             self._save_state()
             where = settings.site_url if settings.uses_graph else settings.local_library
-            self.panel.append(EventKind.SUCCESS, f"SharePoint backup set up: {where} → "
+            self.panel.append(EventKind.SUCCESS, f"Data backup set up: {where} → "
                                                  f"{settings.root_folder}/<paper>/")
             if settings.uses_graph and (not self._safe(self.store.get_sharepoint_token) or changed_site):
                 self._sharepoint_sign_in()
@@ -293,7 +249,7 @@ class SharePointMixin:
     def _sharepoint_sign_in(self) -> None:
         settings = self.app_state.sharepoint
         if not settings.uses_graph:
-            self.panel.append(EventKind.INFO, "No sign-in needed: OneDrive uploads the synced folder. "
+            self.panel.append(EventKind.INFO, "No sign-in needed here: OneDrive does the uploading. "
                                               "Sign in to OneDrive itself if it is not syncing.")
             return
         if not settings.configured:
@@ -304,7 +260,7 @@ class SharePointMixin:
             if account:
                 self.app_state.sharepoint.account = account
                 self._save_state()
-                self.panel.append(EventKind.SUCCESS, f"Signed in to SharePoint as {account}.")
+                self.panel.append(EventKind.SUCCESS, f"Signed in as {account}.")
 
         SharePointSignInDialog(self, self.store, settings, done)
 
@@ -312,19 +268,19 @@ class SharePointMixin:
         self._safe(self.store.clear_sharepoint_token)
         self.app_state.sharepoint.account = ""
         self._save_state()
-        self.panel.append(EventKind.INFO, "Signed out of SharePoint. Files already uploaded stay there.")
+        self.panel.append(EventKind.INFO, "Signed out. Files already uploaded stay where they are.")
 
     def _sharepoint_section(self) -> AccountSection:
         settings = self.app_state.sharepoint
         signed_in = bool(self._safe(self.store.get_sharepoint_token))
         if not settings.configured:
-            status = "SharePoint backup: not set up (optional)"
+            status = "Data backup: not set up (optional)"
         elif not settings.uses_graph:
-            status = f"SharePoint: via OneDrive folder {Path(settings.local_library).name}"
+            status = f"Data backup: OneDrive folder {Path(settings.local_library).name}"
         elif signed_in:
-            status = f"SharePoint: signed in{f' as {settings.account}' if settings.account else ''}"
+            status = f"Data backup: signed in{f' as {settings.account}' if settings.account else ''}"
         else:
-            status = "SharePoint: set up, not signed in"
+            status = "Data backup: set up, not signed in"
         return AccountSection(status, [
             ("Change settings…" if settings.configured else "Set up…", self._sharepoint_settings, True),
             ("Sign in…", self._sharepoint_sign_in, settings.configured and settings.uses_graph),
@@ -340,7 +296,7 @@ class SharePointMixin:
             return client
         token = self.store.get_sharepoint_token()
         if not token:
-            raise SharePointAuthError("Not signed in to SharePoint.")
+            raise SharePointAuthError("Not signed in.")
         session = GraphSession(settings.client_id, settings.tenant, token,
                                on_refresh=self.store.set_sharepoint_token)
         client = SharePointClient(session)
@@ -356,10 +312,10 @@ class SharePointMixin:
             self.panel.append(EventKind.WARNING, "Add a paper first.")
             return
         if self._sharepoint_busy:
-            self.panel.append(EventKind.WARNING, "A SharePoint backup is already running.")
+            self.panel.append(EventKind.WARNING, "A backup is already running.")
             return
         if not settings.configured:
-            self.panel.append(EventKind.INFO, "Set up the SharePoint backup first (Accounts menu).")
+            self.panel.append(EventKind.INFO, "Set up the data backup first (Accounts menu).")
             self._sharepoint_settings()
             return
         if settings.uses_graph and not self._safe(self.store.get_sharepoint_token):
@@ -385,31 +341,31 @@ class SharePointMixin:
             self.panel.append(EventKind.WARNING, f"Not uploaded - {skipped.relative}: {skipped.reason}")
         if plan.empty:
             self._sharepoint_busy = False
-            self.panel.append(EventKind.SUCCESS, f"SharePoint is already up to date "
+            self.panel.append(EventKind.SUCCESS, f"The backup is already up to date "
                                                  f"({plan.unchanged} file(s) in {base}).")
             return
         new = sum(1 for u in plan.uploads if u.new)
         where = settings.site_url if settings.uses_graph else settings.local_library
         warning = None if settings.uses_graph else folder_problem(Path(settings.local_library))
         handover = ("" if settings.uses_graph else
-                    "\n\nOneDrive uploads them to SharePoint from there; its icons show the progress.")
+                    "\n\nOneDrive uploads them from there; its icons show the progress.")
         if warning:
             handover = f"\n\n⚠ {warning}"
             self.panel.append(EventKind.WARNING, warning)
         detail = (f"{len(plan.uploads)} file(s), {human_size(plan.total_bytes)}\n"
                   f"{new} new · {len(plan.uploads) - new} changed · {plan.unchanged} already there\n\n"
                   f"To: {where}\n     {base}/")
-        if not messagebox.askyesno("Back up to SharePoint",
+        if not messagebox.askyesno("Back up data",
                                    f"Copy the {', '.join(settings.folder_list)} folder(s) of "
-                                   f"'{paper}'?\n\n{detail}\n\nNothing in SharePoint is deleted or "
+                                   f"'{paper}'?\n\n{detail}\n\nNothing already there is deleted or "
                                    f"renamed.{handover}", parent=self):
             self._sharepoint_busy = False
-            self.panel.append(EventKind.INFO, "SharePoint backup cancelled - nothing was uploaded.")
+            self.panel.append(EventKind.INFO, "Backup cancelled - nothing was copied.")
             return
         self._run_backup(client, plan, base, paper)
 
     def _run_backup(self, client: Any, plan: Any, base: str, paper: str) -> None:
-        self.panel.append(EventKind.STATE, f"▶ Backing up {paper} to SharePoint")
+        self.panel.append(EventKind.STATE, f"▶ Backing up {paper}")
         window = BackupProgressWindow(self, paper, len(plan.uploads), plan.total_bytes,
                                       handing_off=not self.app_state.sharepoint.uses_graph)
 
@@ -447,7 +403,7 @@ class SharePointMixin:
             summary += f" · {len(result.failed)} failed"
         self.panel.append(EventKind.ERROR if result.failed else EventKind.SUCCESS, summary)
         if result.uploaded and web_url:
-            self.panel.append(EventKind.INFO, f"In SharePoint: {web_url}" if self.app_state.sharepoint.uses_graph
+            self.panel.append(EventKind.INFO, f"In the library: {web_url}" if self.app_state.sharepoint.uses_graph
                               else f"Copied into {web_url} - OneDrive uploads them from there.")
 
     def _sharepoint_failed(self, exc: Exception) -> None:
@@ -456,6 +412,6 @@ class SharePointMixin:
             self.panel.append(EventKind.ERROR, str(exc))
             self._sharepoint_sign_in()
         elif isinstance(exc, SharePointError):
-            self.panel.append(EventKind.ERROR, f"SharePoint: {exc}")
+            self.panel.append(EventKind.ERROR, f"Backup: {exc}")
         else:
-            self.panel.append(EventKind.ERROR, f"SharePoint backup failed: {type(exc).__name__}: {exc}")
+            self.panel.append(EventKind.ERROR, f"Backup failed: {type(exc).__name__}: {exc}")

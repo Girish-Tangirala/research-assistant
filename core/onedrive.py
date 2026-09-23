@@ -108,8 +108,8 @@ def folder_problem(folder: Path) -> str | None:
     """
     roots = sync_roots()
     if not roots:
-        return ("OneDrive does not seem to be set up on this computer, so files copied there may never "
-                "reach SharePoint.")
+        return ("OneDrive does not seem to be set up on this computer, so files copied there would stay "
+                "on this computer.")
     if covering_root(folder, roots) is None:
         listed = "\n".join(f"  • {root}" for root in dict.fromkeys(str(r) for r in roots))
         return (f"{folder}\n\nis not inside a folder OneDrive syncs, so files copied there would stay on "
