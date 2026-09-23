@@ -159,18 +159,21 @@ def _remove_empty_folders(root: Path, paths: list[Path]) -> None:
 
 
 def revert_changes(git: GitManager, applied: AppliedChanges) -> None:
-    """Undo :func:`apply_changes`: move files back, restore tracked files, delete new ones."""
+    """Undo :func:`apply_changes`: delete new files, move files back, restore tracked files."""
+    # New files go first: one of them may sit exactly where a moved file has to return
+    # (organising writes a new top-level main.tex where the old one was moved away from).
+    for rel in applied.created:
+        (applied.root / rel).unlink(missing_ok=True)
     for source_rel, target_rel in reversed(applied.moved):
         source, target = applied.root / source_rel, applied.root / target_rel
         if target.is_file() and not source.exists():
             source.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(target), str(source))
-    # Folders the moves created and that are empty again (e.g. figures/) go too.
-    _remove_empty_folders(applied.root, [applied.root / t for _s, t in applied.moved])
+    # Folders the change created and that are empty again (figures/, code/ ...) go too.
+    _remove_empty_folders(applied.root, [applied.root / t for _s, t in applied.moved]
+                          + [applied.root / rel for rel in applied.created])
     moved_paths = {rel for pair in applied.moved for rel in pair}
     git.discard_changes([w for w in applied.written if w not in applied.created and w not in moved_paths])
-    for rel in applied.created:
-        (applied.root / rel).unlink(missing_ok=True)
     applied.written.clear()
     applied.created.clear()
     applied.moved.clear()

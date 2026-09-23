@@ -336,3 +336,25 @@ def test_videos_and_archives_go_to_the_local_only_supplementary_folder(tmp_path)
     assert moves["demo.mp4"] == "supplementary/demo.mp4"
     assert moves["extra-results.zip"] == "supplementary/extra-results.zip"
     assert any("supplementary/, which is kept on this computer" in w for w in plan.warnings)
+
+
+def test_rollback_restores_a_paper_whose_main_file_moved(tmp_path):
+    """The failure on Paper 3: the new top-level main.tex sat where the moved one had to return."""
+    from core.events import ProposedChange
+    from core.paper import AppliedChanges, apply_changes, revert_changes
+
+    root = tmp_path / "paper"
+    root.mkdir()
+    (root / "main.tex").write_text("the whole paper\n", encoding="utf-8")
+    changes = [
+        ProposedChange(root, "(moves)", "", "", "move", moves=[("main.tex", "manuscript/main.tex")]),
+        ProposedChange(root, "main.tex", "", "\input{manuscript/main}\n", "pointer"),
+        ProposedChange(root, "code/README.md", "", "# code\n", "code folder", placeholder=True),
+    ]
+    applied = AppliedChanges(root)
+    apply_changes(changes, applied)
+    assert (root / "manuscript" / "main.tex").is_file() and (root / "code" / "README.md").is_file()
+    revert_changes(SimpleNamespace(discard_changes=lambda files: None), applied)
+    assert (root / "main.tex").read_text(encoding="utf-8") == "the whole paper\n"   # the paper is back
+    assert not (root / "manuscript").exists() and not (root / "code").exists()
+    assert sorted(p.name for p in root.iterdir()) == ["main.tex"]
