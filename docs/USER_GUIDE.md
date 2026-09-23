@@ -149,6 +149,7 @@ Everything is in the folder **`C:\Users\<you>\.research_agent`**:
 |---|---|
 | `papers\` | your papers, one folder each (you can also open them with **Folder** in the app) |
 | `papers\<paper>\data\` | your datasets. Copy them in with Explorer. This folder stays on your computer: it is never sent to Overleaf, and the AI never changes it |
+| `papers\<paper>\supplementary\` | supplementary material (videos, extra results, large files). Also stays on your computer; upload it to the journal yourself |
 | `reports\` | literature reviews, audits, `.bib` exports |
 | `agent.log` | the detailed log (useful when reporting a problem) |
 | `app_state.json` | your paper list and settings (no passwords) |

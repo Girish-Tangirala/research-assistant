@@ -17,7 +17,7 @@ from core.credentials import host_of, is_https
 from core.events import EventKind
 from core.git_manager import GitManager, GitOperationError
 from core.latex_parser import find_main_tex, list_section_titles
-from core.project_layout import FOLDERS, ensure_data_folder, present_folders, scaffold
+from core.project_layout import FOLDERS, ensure_local_folders, present_folders, scaffold
 from core.reorganize import unsorted_files
 from core.workflows import OrganizeWorkflow, PublishWorkflow
 from core.protection import ProtectionPolicy
@@ -50,9 +50,9 @@ class PapersMixin:
         if current:
             self.app_state.selected = current.name
             root = Path(current.local_path).expanduser()
-            if ensure_data_folder(root):  # every paper gets a local-only data/ folder
-                self.panel.append(EventKind.INFO, f"Created {root / 'data'} for your datasets - it stays on this "
-                                                  "computer and is never sent to Overleaf.")
+            for name in ensure_local_folders(root):  # data/ and supplementary/ are created for every paper
+                self.panel.append(EventKind.INFO, f"Created {root / name} - it stays on this computer and is "
+                                                  "never sent to Overleaf.")
             where = current.remote_url or "on this computer only"
             policy = ProtectionPolicy.build(root, current.read_only, current.auto_protect_bib)
             locked = policy.protected_files()

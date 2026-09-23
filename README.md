@@ -186,11 +186,14 @@ Use the **Paper** dropdown to choose what you're working on, and **Add / Edit / 
 | `bibliography/` | `.bib` files | yes |
 | `code/` | scripts that produce the results | yes |
 | `notes/` | working notes, drafts, meeting notes | yes |
-| `data/` | datasets | **no** — listed in `.gitignore`, stays on this computer |
+| `data/` | datasets | **no** — stays on this computer |
+| `supplementary/` | supplementary material: videos, extra results, anything large that belongs to the work but not in the PDF | **no** — stays on this computer |
 
 `main.tex` sits in the root (that is what Overleaf compiles) and pulls in `manuscript/` with `\input`.
 `README.md` in the folder explains the same thing to your co-authors. The assistant never writes to
-`data/` or `code/` — they are yours.
+`data/`, `supplementary/` or `code/` — they are yours. The two local-only folders are created for every
+paper (also one cloned from Overleaf) and kept out of Git through `.git/info/exclude`, which is private to
+your computer, so nothing is added to the Overleaf project.
 
 ### Organise an existing paper
 
@@ -210,6 +213,7 @@ folders…**. The sidebar shows how many top-level files are not in a folder yet
     `main.tex` that already assembles section files stays as it is.
   - **Every paper gets a `code/` folder** (with a short README, since Git keeps no empty folders) for the
     scripts that produce the results.
+  - **Videos, audio and archives** (`.mp4`, `.zip`, …) go to `supplementary/`, which stays on your computer.
   - Folders that are empty after the move (such as an old `images/`) are removed.
   - If the same image name exists twice (for example `SetUp.png` and `images/SetUp.png`), the one the paper
     uses keeps its name and the other becomes `SetUp-2.png`.

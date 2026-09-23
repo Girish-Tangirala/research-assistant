@@ -32,7 +32,7 @@ python -m venv .venv
 - **Secrets only in the OS vault** (`keyring` → Windows Credential Manager): the Claude key, Git tokens and
   OpenAlex key. Never in `.env`, `.git/config`, logs or the build. Git tokens go per command via
   `GIT_CONFIG_*` env vars. Each user signs in with their **own** Claude API key.
-- **The agent touches only the paper folder**, never `data/` or `code/`, never reference-manager `.bib`
+- **The agent touches only the paper folder**, never `data/`, `supplementary/` or `code/` (`project_layout.PROTECTED_FOLDERS`), never reference-manager `.bib`
   files (`core/protection.py`), and never `todo.md`. Files the user picks come in through file pickers.
 - **Checkable literature:** only papers returned by the search tools, each with its DOI/URL; never invent
   DOIs. The citation audit is deterministic (no LLM).

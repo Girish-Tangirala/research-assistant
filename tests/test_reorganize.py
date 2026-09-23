@@ -83,7 +83,7 @@ def test_plan_sorts_files_and_leaves_latex_essentials_alone(tmp_path):
     kept = dict(plan.kept)
     assert "main.tex" in kept and "zotero.bib" in kept          # root document and the Zotero file stay
     assert "ieee.cls" in kept and "ieee.cls" not in moves        # LaTeX needs it next to main.tex
-    assert any("data file(s) move into data/" in w for w in plan.warnings)
+    assert any("move into data/, which is kept on this computer" in w for w in plan.warnings)
 
     report = plan_to_markdown(plan, "Test paper")
     assert "`sections/method.tex` | `manuscript/method.tex`" in report and "zotero.bib" in report
@@ -323,3 +323,16 @@ def test_organising_again_changes_nothing(tmp_path, single_file_remote):
     files = files_of(clone)
     plan = plan_reorganisation(clone, files, "paper.tex", lambda rel: None)
     assert plan.empty, (plan.moves, plan.created)
+
+
+def test_videos_and_archives_go_to_the_local_only_supplementary_folder(tmp_path):
+    root = tmp_path / "paper"
+    root.mkdir()
+    (root / "main.tex").write_text("x", encoding="utf-8")
+    (root / "demo.mp4").write_bytes(b"0" * 10)
+    (root / "extra-results.zip").write_bytes(b"0" * 10)
+    plan = plan_reorganisation(root, files_of(root), "main.tex", lambda rel: None)
+    moves = dict(plan.moves)
+    assert moves["demo.mp4"] == "supplementary/demo.mp4"
+    assert moves["extra-results.zip"] == "supplementary/extra-results.zip"
+    assert any("supplementary/, which is kept on this computer" in w for w in plan.warnings)

@@ -1,8 +1,9 @@
 """Organise an existing paper into the standard folders.
 
 Files that are already in the repository are sorted into ``manuscript/``,
-``figures/``, ``bibliography/``, ``code/``, ``notes/`` and ``data/`` (see
-:mod:`core.project_layout`), and every ``\\input``, ``\\includegraphics``,
+``figures/``, ``bibliography/``, ``code/``, ``notes/``, ``data/`` and
+``supplementary/`` (see :mod:`core.project_layout`; the last two stay on this
+computer), and every ``\\input``, ``\\includegraphics``,
 ``\\bibliography`` and ``\\addbibresource`` that points at a moved file is
 rewritten. Class and style files and read-only (reference-manager) files stay where
 they are. A paper written as a single .tex file moves into ``manuscript/`` and a one-line
@@ -19,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from core.latex_parser import comment_mask, strip_comments
-from core.project_layout import FOLDERS
+from core.project_layout import FOLDERS, LOCAL_ONLY
 
 # Extension -> target folder.
 TEX_EXTS = {".tex"}
@@ -28,6 +29,9 @@ BIB_EXTS = {".bib"}
 CODE_EXTS = {".py", ".ipynb", ".m", ".r", ".jl", ".c", ".cpp", ".h", ".hpp", ".sh", ".ps1", ".sql"}
 DATA_EXTS = {".csv", ".tsv", ".xlsx", ".xls", ".mat", ".h5", ".hdf5", ".npy", ".npz", ".dat", ".parquet"}
 NOTE_EXTS = {".md", ".txt", ".rst", ".docx", ".odt"}
+# Big extras that belong to the work but not into the PDF; kept on this computer only.
+SUPPLEMENTARY_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".wmv", ".webm", ".wav", ".mp3", ".zip", ".7z",
+                      ".tar", ".gz", ".rar"}
 # Never moved: LaTeX looks for these next to the root document, or they are the app's own files.
 KEEP_AT_ROOT_EXTS = {".cls", ".sty", ".bst", ".clo", ".ist", ".bbl", ".cfg"}
 KEEP_AT_ROOT_NAMES = {"readme.md", "todo.md", "license", "license.md", "license.txt", "makefile",
@@ -42,6 +46,7 @@ ALIASES = {
     "code": {"code", "scripts", "script", "src", "analysis", "matlab", "python"},
     "data": {"data", "datasets", "dataset", "raw", "results"},
     "notes": {"notes", "note", "docs", "doc", "admin"},
+    "supplementary": {"supplementary", "supplement", "extra", "extras", "media", "videos", "video"},
 }
 FOLDER_NAMES = {f.name for f in FOLDERS}
 _PATH_COMMANDS = re.compile(
@@ -111,6 +116,8 @@ def _category(rel: str, name: str, suffix: str, referenced_images: set[str], roo
         return "code"
     if suffix in DATA_EXTS:
         return "data"
+    if suffix in SUPPLEMENTARY_EXTS:
+        return "supplementary"
     if suffix == ".pdf" and rel not in referenced_images:
         return "notes" if root is not None and _pdf_pages(root / rel) > 1 else "figures"
     if suffix in FIGURE_EXTS:
@@ -255,11 +262,13 @@ def plan_reorganisation(root: Path, files: list[str], main_rel: str, is_protecte
         new_text = _rewrite(text, mapping, root, main_rel, main_source)
         if new_text != text:
             plan.rewrites[mapping.get(rel, rel)] = new_text
-    moved_data = [t for _s, t in plan.moves if t.startswith("data/")]
-    if moved_data:
-        plan.warnings.append(
-            f"{len(moved_data)} data file(s) move into data/. They were already part of the project, so they "
-            "stay in it (and in Overleaf); delete them there if you want them only on this computer.")
+    for folder in LOCAL_ONLY:
+        moved = [t for _s, t in plan.moves if t.startswith(f"{folder}/")]
+        if moved:
+            plan.warnings.append(
+                f"{len(moved)} file(s) move into {folder}/, which is kept on this computer. They were already "
+                "part of the project, so they stay in it (and in Overleaf); delete them there if you want them "
+                "only on this computer.")
     return plan
 
 

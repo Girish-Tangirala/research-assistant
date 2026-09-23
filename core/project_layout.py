@@ -43,6 +43,8 @@ FOLDERS: tuple[Folder, ...] = (
     Folder("code", "scripts that produce the results", agent_writable=False),
     Folder("notes", "working notes, drafts, meeting notes"),
     Folder("data", "datasets - kept on this computer only", synced=False, agent_writable=False),
+    Folder("supplementary", "supplementary material such as videos and extra results - kept on this "
+                            "computer only (it can be large)", synced=False, agent_writable=False),
 )
 LOCAL_ONLY = tuple(f.name for f in FOLDERS if not f.synced)
 PROTECTED_FOLDERS = tuple(f.name for f in FOLDERS if not f.agent_writable)
@@ -176,51 +178,67 @@ def scaffold(root: Path, title: str, author: str = "") -> list[str]:
     write(".gitignore", gitignore_text())
     write("README.md", README_TEMPLATE % {"title": title or "Untitled paper", "rows": folder_rows()})
     for folder in FOLDERS:
-        if folder.name == "data":
-            write("data/README.md", DATA_README)
+        if folder.name in LOCAL_READMES:
+            write(f"{folder.name}/README.md", LOCAL_READMES[folder.name])
         elif folder.name not in ("manuscript", "figures", "bibliography"):
             write(f"{folder.name}/README.md", f"# {folder.name}\n\n{folder.purpose.capitalize()}.\n")
     return sorted(created)
 
 
-DATA_README = """# data
+LOCAL_READMES = {
+    "data": """# data
 
 Put the datasets of this paper here (copy them in with Explorer - the **Folder** button opens this paper).
 
 This folder stays on this computer: it is never committed, never sent to Overleaf and never
 changed by the assistant.
-"""
-EXCLUDE_ENTRY = "/data/"
+""",
+    "supplementary": """# supplementary
+
+Supplementary material of this paper: videos, extra result files, anything that belongs to the work
+but not into the PDF. Large files are fine here.
+
+This folder stays on this computer: it is never committed, never sent to Overleaf and never
+changed by the assistant. Upload it to the journal (or a data repository) yourself.
+""",
+}
 
 
-def ensure_data_folder(root: Path) -> bool:
-    """Give every paper a local-only ``data/`` folder - also papers cloned from Overleaf.
+def ensure_local_folders(root: Path) -> list[str]:
+    """Give every paper its local-only folders (``data/``, ``supplementary/``).
 
-    Git is told to ignore it through ``.git/info/exclude``, which (unlike ``.gitignore``)
-    is private to this computer, so nothing is added to the Overleaf project.
+    Also papers cloned from Overleaf. Git is told to ignore them through ``.git/info/exclude``,
+    which (unlike ``.gitignore``) is private to this computer, so nothing is added to the
+    Overleaf project.
 
     Only folders that already hold a paper (a Git repository) are touched, so a folder
     that is about to be cloned into stays empty.
 
     Returns:
-        ``True`` if the folder was created now.
+        The folders that were created now.
     """
     if not (root / ".git").is_dir():
-        return False
-    data = root / "data"
-    created = not data.exists()
-    data.mkdir(exist_ok=True)
-    readme = data / "README.md"
-    if not readme.exists():
-        readme.write_text(DATA_README, encoding="utf-8", newline="\n")
+        return []
+    created = []
+    for name in LOCAL_ONLY:
+        folder = root / name
+        if not folder.exists():
+            created.append(name)
+        folder.mkdir(exist_ok=True)
+        readme = folder / "README.md"
+        if not readme.exists():
+            readme.write_text(LOCAL_READMES.get(name, f"# {name}\n"), encoding="utf-8", newline="\n")
     info = root / ".git" / "info"
     exclude = info / "exclude"
     text = exclude.read_text(encoding="utf-8", errors="replace") if exclude.exists() else ""
-    if not any(line.strip() in ("data/", "/data/", "/data") for line in text.splitlines()):
+    listed = {line.strip().strip("/") for line in text.splitlines()}
+    missing = [name for name in LOCAL_ONLY if name not in listed]
+    if missing:
         info.mkdir(parents=True, exist_ok=True)
         prefix = "" if not text or text.endswith("\n") else "\n"
+        entries = "".join(f"/{name}/\n" for name in missing)
         with exclude.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(f"{prefix}# Research Assistant: datasets stay on this computer\n{EXCLUDE_ENTRY}\n")
+            handle.write(f"{prefix}# Research Assistant: these folders stay on this computer\n{entries}")
     return created
 
 

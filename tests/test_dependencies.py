@@ -12,7 +12,7 @@ import pytest
 from git import Repo
 
 from core import dependencies as deps
-from core.project_layout import ensure_data_folder
+from core.project_layout import ensure_local_folders
 
 SHA = "5aa8a20f6e9abb2c755f0e73c91c687701a46b309ad84a0ca6509380fa4ae290"
 
@@ -95,21 +95,24 @@ def test_install_miktex_runs_unattended_for_this_user_only():
         deps.install_miktex(Path("x.exe"), run=lambda cmd, timeout: SimpleNamespace(returncode=1))
 
 
-def test_every_paper_gets_a_local_only_data_folder(tmp_path):
+def test_every_paper_gets_local_only_data_and_supplementary_folders(tmp_path):
     empty = tmp_path / "about-to-be-cloned"
     empty.mkdir()
-    assert not ensure_data_folder(empty) and not any(empty.iterdir())  # never block a clone
+    assert not ensure_local_folders(empty) and not any(empty.iterdir())  # never block a clone
     root = tmp_path / "paper"
     repo = Repo.init(root)
     (root / "main.tex").write_text("x", encoding="utf-8")
     repo.git.add("-A")
     repo.git.commit("-m", "start", "--author", "T <t@x>", env={"GIT_COMMITTER_NAME": "T", "GIT_COMMITTER_EMAIL": "t@x"})
-    assert ensure_data_folder(root) and (root / "data" / "README.md").is_file()
-    (root / "data" / "measurements.csv").write_text("1,2\n", encoding="utf-8")
+    assert ensure_local_folders(root) == ["data", "supplementary"]
+    assert (root / "data" / "README.md").is_file() and (root / "supplementary" / "README.md").is_file()
+    (root / "data" / "measurements.csv").write_text("1,2", encoding="utf-8")
+    (root / "supplementary" / "demo.mp4").write_bytes(b"0" * 100)   # large extras stay here
     assert not repo.is_dirty(untracked_files=True)  # invisible to Git: never committed or synced
     assert not (root / ".gitignore").exists()        # nothing added to the Overleaf project
-    assert not ensure_data_folder(root)              # idempotent
-    assert (root / ".git" / "info" / "exclude").read_text(encoding="utf-8").count("/data/") == 1
+    assert not ensure_local_folders(root)            # idempotent
+    exclude = (root / ".git" / "info" / "exclude").read_text(encoding="utf-8")
+    assert exclude.count("/data/") == 1 and exclude.count("/supplementary/") == 1
 
 
 def test_install_git_refuses_a_too_long_folder_and_cleans_up_failures(tmp_path, monkeypatch):
