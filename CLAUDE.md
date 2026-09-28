@@ -32,17 +32,22 @@ python -m venv .venv
 - **Secrets only in the OS vault** (`keyring` → Windows Credential Manager): the Claude key, Git tokens,
   the OpenAlex key and the SharePoint refresh token. Never in `.env`, `.git/config`, logs or the build. Git
   tokens go per command via `GIT_CONFIG_*` env vars. Each user signs in with their **own** Claude API key.
-- **SharePoint is upload-only and button-gated** (`core/sharepoint*.py`): the ☁ Back up data button mirrors
-  `data/` and `supplementary/` into a library and never downloads, renames or deletes there. Two routes
-  behind one interface (`index`/`ensure_folder`/`upload`), so `sharepoint_sync.py` knows about neither:
-  a OneDrive-synced folder (the **default** — THI blocks `portal.azure.com` for non-admins, so an app
-  registration is not available to the users) and Microsoft Graph. Graph uses stdlib `urllib` only (no
-  `msal`/`requests`) and is a public client, so no client secret exists anywhere. What to re-send is decided
-  from a local manifest in `workspace/sharepoint/`, never by comparing against the server's clock.
-  `core/onedrive.py` reads OneDrive's real sync roots from `HKCU\Software\Microsoft\OneDrive\Accounts` to
-  warn (never refuse) about a folder OneDrive does not watch; registry values there can hold unexpanded
-  `%UserProfile%`. In a Tk `Toplevel`, never name an attribute `state` — it shadows `Toplevel.state()` and
-  CustomTkinter's DPI tracker calls it.
+- **The data backup is upload-only and button-gated** (`core/sharepoint*.py`, `core/onedrive.py`): the
+  ☁ Back up data button mirrors `data/` and `supplementary/` into a folder and never downloads, renames or
+  deletes there. What to re-send is decided from a local manifest in `workspace/backup/`, never by comparing
+  against a server's clock. `core/onedrive.py` reads OneDrive's real sync roots from
+  `HKCU\Software\Microsoft\OneDrive\Accounts` to warn (never refuse) about a folder OneDrive does not watch;
+  registry values there can hold unexpanded `%UserProfile%`.
+- **The interface says OneDrive and never SharePoint** — asked for on 2026-09-23, because the users have no
+  SharePoint library and the tenant blocks `portal.azure.com` for non-admins, so the word only confuses.
+  Two routes sit behind one interface (`index`/`ensure_folder`/`upload`), so `sharepoint_sync.py` knows about
+  neither: the OneDrive-synced folder (`sharepoint_folder.py`, the only one reachable) and Microsoft Graph
+  (`sharepoint.py` — stdlib `urllib` only, public client, no secret anywhere). Graph is **hidden, not
+  deleted**: keep it working, and restore the mode switch in `SharePointSettingsDialog` (see README) when a
+  library exists. `test_no_user_visible_string_mentions_sharepoint` guards the wording — widen its allowlist
+  if Graph comes back.
+- In a Tk `Toplevel`, never name an attribute `state` — it shadows `Toplevel.state()` and CustomTkinter's
+  DPI tracker calls it.
 - **The agent touches only the paper folder**, never `data/`, `supplementary/` or `code/` (`project_layout.PROTECTED_FOLDERS`), never reference-manager `.bib`
   files (`core/protection.py`), and never `todo.md`. Files the user picks come in through file pickers.
 - **Checkable literature:** only papers returned by the search tools, each with its DOI/URL; never invent
