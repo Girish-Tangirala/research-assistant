@@ -29,6 +29,7 @@ The window opens maximised, in three columns:
 | **Literature Review** | Searches OpenAlex, Crossref and arXiv (plus Claude web search if enabled) and writes a themed review with a link for every paper. Adds a verification table and a `.bib` of new candidates. | No |
 | **Add Figures** | Copies images from any folder into the paper's figures folder and inserts `figure` blocks with labels. Claude can draft each caption by looking at the image and add a "Figure~\ref{…}" sentence. | After approval |
 | **Add References** | Turns DOIs, arXiv IDs or links, titles, or `.bib` files from your computer into BibTeX entries, using data from OpenAlex, Crossref or arXiv; duplicates are skipped. Optionally cites them in a section. | After approval |
+| **Results Figures & Tables** | Reads your own training/inference results (CSV, Excel, a Keras/PyTorch history JSON, a scikit-learn classification report, a confusion matrix) from a file or a whole folder and inserts a training curve, a comparison bar chart, a confusion-matrix heat map or a results table as `pgfplots`/`booktabs` code. Claude chooses the columns and writes the caption; every number is read from the file. | After approval |
 | **Citation & BibTeX Audit** | Flags missing or duplicate keys (with typo suggestions), missing or malformed DOIs, missing fields and unused entries. | No |
 | **Custom Agent Task** | A free-form goal; Claude plans with all tools (read, search, edit, audit, compile, commit). | After approval |
 
@@ -39,6 +40,34 @@ The window opens maximised, in three columns:
 - **Flagged links:** any DOI or link in the review that no tool returned is listed under **"⚠ Not returned by any search tool"** for you to check by hand.
 - **BibTeX export:** new candidates are saved as a `.bib` file built only from the retrieved metadata. Nothing is inserted into your paper.
 - **Summaries:** these are based on abstracts and labelled as such. Links in the *Report* tab open in your browser.
+
+### Figures and tables from your results
+
+Point the task at the files your training or inference runs produced - or at a whole folder - and it draws
+them into the paper.
+
+- **Files it reads:** `.csv`/`.tsv` (comma, semicolon or tab separated), `.xlsx`/`.xlsm` (one table per sheet),
+  `.json` (a Keras/PyTorch `history`, a list of records, or one object per model), and `.txt`/`.log` holding a
+  scikit-learn `classification_report` or a printed confusion matrix. **Add folder...** scans a folder
+  recursively; a file it cannot read becomes a warning, not a failure, so one stray log does not stop the rest.
+- **What it draws:** a line chart (training curves), a grouped bar chart, a confusion-matrix heat map, or a
+  `booktabs` table. Choose one, or let Claude pick from the data.
+- **No pictures, real LaTeX:** charts become `pgfplots` code and tables `booktabs` code, so the numbers are
+  text in your `.tex`. You see every value in the approval window, the fonts match the paper, and you can edit
+  the chart later in Overleaf. `\usepackage{pgfplots}` (with `\pgfplotsset{compat=1.18}`) or `booktabs` is
+  added if missing.
+- **Why the numbers can be trusted:** the app parses the file and draws it; **Claude only chooses which table
+  and which columns to show, and writes the caption.** It never types a number. A plan naming a column that
+  does not exist, or a non-numeric column, is rejected and sent back for repair - the same repair loop the
+  other workflows use. The report says which file, which columns and how many rows the figure came from.
+- **Honest axes:** bar charts always start at zero, whole-number x axes (epochs) never get fractional ticks,
+  and a confusion matrix prints the count in every cell.
+- **Your data stays local:** the files are only read - nothing is ever written into `data/` or
+  `supplementary/`, and those folders still never reach Overleaf. The numbers that end up *in the figure* do
+  travel with the paper, which is the point of the feature.
+- **Limits:** at most 8 series in one chart, 24 bar groups, 30 classes in a matrix and 5000 rows per file;
+  past those the task asks you for a table instead. Files over 25 MB are refused - export the summary you
+  want to plot.
 
 ### Adding figures
 
@@ -353,6 +382,9 @@ core/
   workflows.py          → literature review, audit, safe edit, custom task, sync
   asset_workflows.py    → Add Figures / Add References
   figures.py            → image checks, conversion, graphics folder, figure blocks
+  results_data.py       → reads results files (CSV/Excel/JSON history/sklearn report/matrix) into tables
+  results_latex.py      → draws them as pgfplots charts and booktabs tables (no LLM, no numbers invented)
+  results_workflow.py   → Results Figures & Tables: pick a table, validate the plan, insert the float
   references.py         → identifier resolution, de-duplication, BibTeX, \bibliography wiring
   registry.py           → workflow tab order
   todos.py              → shared todo.md: format, operations, replay-on-conflict syncing
@@ -375,6 +407,7 @@ gui/
   panels.py             → task selector, live log, report viewer with links
   papers.py             → paper list, add/edit dialogs, folder setup, sync status
   task_forms.py         → one parameter form per tab (file pickers, section pickers)
+  results_form.py       → the Results Figures & Tables form (file/folder picker, chart kind)
   todo_panel.py         → the To-Do tab (filters, add/edit/tick/delete, auto-refresh)
   accounts.py           → sign-in handling (Accounts menu, sign-in prompts)
   sharepoint.py         → backup settings dialog, progress window, the Back up data action

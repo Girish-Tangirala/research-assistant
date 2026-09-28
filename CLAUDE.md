@@ -50,6 +50,12 @@ python -m venv .venv
   DPI tracker calls it.
 - **The agent touches only the paper folder**, never `data/`, `supplementary/` or `code/` (`project_layout.PROTECTED_FOLDERS`), never reference-manager `.bib`
   files (`core/protection.py`), and never `todo.md`. Files the user picks come in through file pickers.
+  Those folders are write-protected, not secret: **Results Figures & Tables** reads result files from them
+  (through a file picker) and writes only into the manuscript.
+- **Results figures carry no model-written numbers.** `core/results_data.py` parses the file, `core/results_latex.py`
+  draws it as pgfplots/booktabs; Claude only picks the table, the columns and the caption, and a plan naming a
+  column that does not exist is rejected and repaired. Keep that split — it is the "never invent DOIs" rule for
+  numbers. Bar charts keep `ymin=0`.
 - **Checkable literature:** only papers returned by the search tools, each with its DOI/URL; never invent
   DOIs. The citation audit is deterministic (no LLM).
 - **Compiling works like Overleaf:** no `-halt-on-error`; latexmk runs with `-f -g`.

@@ -86,6 +86,7 @@ def build_app(icon: Path) -> Path:
         "--collect-all", "pypdfium2_raw",
         "--hidden-import", "keyring.backends.Windows",
         "--hidden-import", "win32ctypes.core",
+        "--hidden-import", "openpyxl",          # imported lazily when a .xlsx of results is read
         "--add-data", f"{GUIDE}{';' if sys.platform == 'win32' else ':'}docs",
         "--exclude-module", "pytest",
         "--exclude-module", "tests",

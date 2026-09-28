@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from core.asset_workflows import AddFiguresWorkflow, AddReferencesWorkflow
+from core.results_workflow import ResultsFigureWorkflow
 from core.workflows import (
     BaseWorkflow, CitationAuditWorkflow, CustomAgentWorkflow, LiteratureReviewWorkflow, SafeEditWorkflow,
 )
@@ -14,6 +15,7 @@ WORKFLOWS: dict[str, type[BaseWorkflow]] = {
         LiteratureReviewWorkflow,
         AddFiguresWorkflow,
         AddReferencesWorkflow,
+        ResultsFigureWorkflow,
         CitationAuditWorkflow,
         CustomAgentWorkflow,
     )

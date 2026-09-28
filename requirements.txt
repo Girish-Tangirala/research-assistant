@@ -4,6 +4,7 @@ customtkinter>=5.2         # Modern dark-mode Tk GUI
 GitPython>=3.1.43          # clone / pull / branch / commit / push
 keyring>=25                # stores sign-ins in Windows Credential Manager / Keychain
 pillow>=10                 # figure previews, image conversion, image input for captions
+openpyxl>=3.1              # reads .xlsx results tables (pure Python, no Excel needed)
 pypdfium2>=4.30            # renders the PDF preview pane (PDFium, Apache/BSD licensed)
 python-dotenv>=1.0         # optional .env for non-secret settings
 

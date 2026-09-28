@@ -48,6 +48,8 @@ class FormContext:
 class FileList(ctk.CTkFrame):
     """A list of local files collected from any number of folders."""
 
+    empty_text = "No files chosen - click 'Add files…' (repeat for other folders)."
+
     def __init__(self, master: Any, title: str, filetypes: list[tuple[str, str]], height: int = 90) -> None:
         super().__init__(master, fg_color="transparent")
         self.files: list[Path] = []
@@ -82,7 +84,7 @@ class FileList(ctk.CTkFrame):
     def _render(self) -> None:
         self.box.configure(state="normal")
         self.box.delete("1.0", "end")
-        text = "\n".join(str(p) for p in self.files) or "No files chosen - click 'Add files…' (repeat for other folders)."
+        text = "\n".join(str(p) for p in self.files) or self.empty_text
         self.box.insert("1.0", text)
         self.box.configure(state="disabled")
 
@@ -403,5 +405,8 @@ class CustomForm(Form):
         return {"goal": self.value("goal")}
 
 
+# Imported last: gui.results_form builds on Form/FileList above, so this module must be complete first.
+from gui.results_form import ResultsForm  # noqa: E402
+
 FORMS: dict[str, type[Form]] = {form.workflow.name: form for form in (
-    LiteratureForm, ReferencesForm, EditForm, FiguresForm, AuditForm, CustomForm)}
+    LiteratureForm, ReferencesForm, EditForm, FiguresForm, ResultsForm, AuditForm, CustomForm)}

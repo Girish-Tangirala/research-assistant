@@ -107,8 +107,24 @@ Click **🤖 Agent tasks**, pick a **Task** from the dropdown, fill in the form 
 | **Literature Review** | searches OpenAlex, Crossref and arXiv and writes a review with a link for every paper | no, report only |
 | **Add Figures** | adds images from any folder, with captions; can also **replace** a figure | after your OK |
 | **Add References** | turns DOIs, arXiv IDs or titles into BibTeX entries | after your OK |
+| **Results Figures & Tables** | turns your training or inference results into a graph or a table in the paper | after your OK |
 | **Citation & BibTeX Audit** | finds missing, duplicate or broken citations | no, report only |
 | **Custom Agent Task** | any instruction in your own words | after your OK |
+
+**Making a graph or a table from your results**
+
+Choose **Results Figures & Tables**, click **Add files...** (or **Add folder...**) and pick the files your
+training run produced: a CSV or Excel table, a saved Keras/PyTorch history (`.json`), or a text file with a
+`classification_report` or a confusion matrix. Pick what to draw - training curves, a bar chart, a confusion
+matrix, a table - or leave it on *Let Claude choose*.
+
+The AI decides which columns are worth showing and writes the caption. **It never types a number**: the app
+reads the values out of your file and draws them, so the graph always matches the file. The graph is added as
+real LaTeX (`pgfplots`), not as a picture, so the fonts match your paper and you can still change it in
+Overleaf later.
+
+Your result files are only read. Nothing is written into `data\` or `supplementary\`, and those folders still
+never leave your computer - only the numbers that end up in the figure travel with the paper.
 
 **How approval works**
 

@@ -169,3 +169,51 @@ Section text for context:
 </section>
 
 Return only the LaTeX inside <latex>...</latex> tags."""
+
+RESULTS_SYSTEM = """\
+You turn a researcher's own experiment results into one figure or table for their \
+LaTeX paper. You decide WHAT to show; the application draws it and takes every \
+number straight from the file.
+
+Hard constraints:
+- Never write, repeat or correct a number. You only name columns that the table \
+already has; the exact spelling matters.
+- Choose the presentation the data supports: a line chart for values over epochs, \
+a bar chart to compare a handful of models or classes, a matrix for a confusion \
+matrix, a table when there are many columns or the exact values matter.
+- Axis labels and the caption use the paper's own terminology (model names, \
+dataset names, lighting conditions) as the surrounding text writes them.
+- Never claim a result the table does not show, and never say which model is best \
+unless the numbers in the table say so.
+- Escape special characters in the caption: \\%, \\&, \\#, \\_. No \\label in the caption."""
+
+RESULTS_PROMPT = """\
+Paper: "{title}"
+{context}
+The figure will be placed at the end of the section "{section_title}" with the \
+label `{label}`.
+{user_hint}
+These tables were read from the author's results files. The values shown are a \
+preview; the full table is used for drawing.
+
+{tables}
+
+Choose ONE table and how to present it. Return exactly this, and nothing else:
+
+<plan>
+table: <the id number of the table you chose>
+kind: <line|bar|matrix|table>
+x: <column name used for the x axis (line/bar) or the row labels (matrix/table)>
+series: <comma-separated numeric column names to draw; for kind=table list the \
+columns to show, in order>
+legend: <optional, comma-separated "column = nicer name" pairs>
+x_label: <x axis label>
+y_label: <y axis label>
+</plan>
+<caption>A LaTeX caption: one short title-like sentence, then 1-2 sentences saying \
+what the reader should take from it. No \\label.</caption>
+{sentence_request}"""
+
+RESULTS_SENTENCE_REQUEST = """\
+<sentence>One LaTeX sentence to append to the section text that introduces it and \
+refers to it as {kind_word}~\\ref{{{label}}}. State only what the numbers show.</sentence>"""

@@ -131,6 +131,25 @@ def ensure_graphicx(main_source: str) -> str | None:
     """Return the preamble with ``\\usepackage{graphicx}`` added, or ``None`` if present."""
     if _GRAPHICX_RE.search(strip_comments(main_source)):
         return None
+    return _add_to_preamble(main_source, "\\usepackage{graphicx}\n", "graphicx")
+
+
+def ensure_package(main_source: str, name: str, options: str = "", extra: str = "") -> str | None:
+    """Add ``\\usepackage[options]{name}`` (plus an ``extra`` setup line) if missing.
+
+    Returns the new preamble, or ``None`` when the package is already loaded.
+    """
+    pattern = re.compile(r"\\usepackage(?:\[[^\]]*\])?\{[^}]*\b" + re.escape(name) + r"\b[^}]*\}")
+    if pattern.search(strip_comments(main_source)):
+        return None
+    block = f"\\usepackage{f'[{options}]' if options else ''}{{{name}}}\n"
+    if extra:
+        block += extra.rstrip("\n") + "\n"
+    return _add_to_preamble(main_source, block, name)
+
+
+def _add_to_preamble(main_source: str, block: str, name: str) -> str:
+    """Insert ``block`` after the last \\usepackage (or the \\documentclass) line."""
     mask = comment_mask(main_source)
     begin = main_source.find("\\begin{document}")
     anchor = None
@@ -140,9 +159,9 @@ def ensure_graphicx(main_source: str) -> str | None:
     if anchor is None:
         doc = re.search(r"\\documentclass(?:\[[^\]]*\])?\{[^}]*\}[^\n]*\n", main_source)
         if doc is None:
-            raise FigureError("Could not find the preamble to add \\usepackage{graphicx}.")
+            raise FigureError(f"Could not find the preamble to add \\usepackage{{{name}}}.")
         anchor = doc.end()
-    return main_source[:anchor] + "\\usepackage{graphicx}\n" + main_source[anchor:]
+    return main_source[:anchor] + block + main_source[anchor:]
 
 
 def section_text_end(tex: str, title: str) -> int:
