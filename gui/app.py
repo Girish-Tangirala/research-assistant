@@ -83,7 +83,9 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         self.geometry(f"{min(1600, screen_w - 80)}x{min(900, screen_h - 80)}")
         self.minsize(min(1100, screen_w - 40), min(650, screen_h - 40))
         self._fullscreen = False
-        self.after(0, lambda: self.set_fullscreen(True))   # the PDF needs the room
+        # Start maximised - the PDF needs the room, but the title bar stays reachable.
+        # F11 (or View ▸ Full screen) gives the whole screen when you want it.
+        self.after(0, lambda: self.set_fullscreen(False))
         self.bind("<F11>", lambda _e: self.toggle_fullscreen())
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -186,7 +188,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         self.preview_var = ctk.BooleanVar(value=self.app_state.preview)
         self.confirm_var = ctk.BooleanVar(value=self.app_state.confirm_push)
         self.preview_visible_var = ctk.BooleanVar(value=self.app_state.show_preview)
-        self.fullscreen_var = ctk.BooleanVar(value=True)
+        self.fullscreen_var = ctk.BooleanVar(value=False)
         self.menubar = AppMenuBar(
             self,
             MenuActions(

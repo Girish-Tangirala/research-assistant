@@ -149,7 +149,12 @@ def test_a_tall_dialog_is_clamped_to_the_screen_and_keeps_its_buttons(app, monke
         dialog.destroy()
 
 
-def test_the_window_can_leave_full_screen(app):
+def test_the_window_starts_maximised_not_full_screen(app):
+    """Full screen hides the title bar, so it is opt-in rather than the default."""
+    assert app.fullscreen_var.get() is False
+
+
+def test_full_screen_can_be_turned_on_and_off(app):
     app.set_fullscreen(False)
     app.update()
     assert app.fullscreen_var.get() is False
