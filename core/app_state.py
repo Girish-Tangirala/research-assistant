@@ -75,6 +75,36 @@ class SharePointSettings:
         return [f.strip().strip("/") for f in self.folders.split(",") if f.strip().strip("/")]
 
 
+@dataclass
+class TodoRepoSettings:
+    """The repository holding the shared to-do list (one list for every paper).
+
+    It is a small repository of its own - not a paper - so a to-do change never
+    touches a manuscript and never waits for the Sync button. The token is the
+    normal per-host Git sign-in in the OS vault; nothing secret is stored here.
+    """
+
+    url: str = ""
+    branch: str = ""
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.url.strip())
+
+
+def validate_todo_repo(settings: TodoRepoSettings) -> list[str]:
+    problems = []
+    url = settings.url.strip()
+    if url:
+        if not URL_RE.match(url):
+            problems.append("The to-do repository link must start with https:// or git@.")
+        elif CREDENTIAL_URL_RE.match(url):
+            problems.append("Remove the user name and token from the link - sign in under Accounts instead.")
+        if settings.branch.strip() and not BRANCH_RE.match(settings.branch.strip()):
+            problems.append(f"{settings.branch!r} is not a valid branch name.")
+    return problems
+
+
 def validate_sharepoint(settings: SharePointSettings) -> list[str]:
     """Human-readable problems with the SharePoint settings (empty list = OK)."""
     problems: list[str] = []
@@ -160,6 +190,13 @@ def _sharepoint_from_json(data: object) -> SharePointSettings:
     return settings
 
 
+def _todo_repo_from_json(data: object) -> TodoRepoSettings:
+    if not isinstance(data, dict):
+        return TodoRepoSettings()
+    fields = TodoRepoSettings.__dataclass_fields__
+    return TodoRepoSettings(**{k: str(v) for k, v in data.items() if k in fields})
+
+
 def default_local_path(papers_dir: Path, name: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", name).strip("-").lower() or "paper"
     return str(papers_dir / slug)
@@ -179,6 +216,7 @@ class AppState:
     author_name: str = ""
     author_email: str = ""
     sharepoint: SharePointSettings = field(default_factory=SharePointSettings)
+    todo_repo: TodoRepoSettings = field(default_factory=TodoRepoSettings)
 
     # -- papers ------------------------------------------------------------ #
     @property
@@ -231,6 +269,7 @@ class AppState:
             author_name=str(data.get("author_name", "")),
             author_email=str(data.get("author_email", "")),
             sharepoint=_sharepoint_from_json(data.get("sharepoint")),
+            todo_repo=_todo_repo_from_json(data.get("todo_repo")),
         )
 
     def save(self, path: Path) -> None:

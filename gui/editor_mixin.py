@@ -20,9 +20,11 @@ from core.git_manager import GitManager, GitOperationError
 from core.project_layout import PROTECTED_FOLDERS
 from core.protection import ProtectionPolicy
 from gui.tex_editor import EditorContext, TexEditor
+from gui.todo_panel import TodoContext, TodoPanel
 
 AGENT_MODE = "🤖  Agent tasks"
 EDITOR_MODE = "✎  Edit .tex"
+TODO_MODE = "☑  To-Do"
 
 
 class EditorMixin:
@@ -30,13 +32,14 @@ class EditorMixin:
 
     def _build_middle(self, parent: Any) -> ctk.CTkFrame:
         middle = ctk.CTkFrame(parent, fg_color="transparent")
-        self.mode_switch = ctk.CTkSegmentedButton(middle, values=[AGENT_MODE, EDITOR_MODE],
+        self.mode_switch = ctk.CTkSegmentedButton(middle, values=[AGENT_MODE, EDITOR_MODE, TODO_MODE],
                                                   command=self.show_mode)
         self.mode_switch.pack(fill="x", pady=(0, 8))
         self._editor_paper: Path | None = None
         return middle
 
-    def _attach_editor(self, middle: ctk.CTkFrame) -> None:
+    def _attach_editor(self, middle: ctk.CTkFrame, todo: TodoContext) -> None:
+        self.todo = TodoPanel(middle, todo)
         self.editor = TexEditor(middle, EditorContext(
             paper_root=self._paper_root, read_only_reason=self._editor_read_only,
             save_blocked=self._editor_save_blocked, commit=self._editor_commit,
@@ -44,19 +47,25 @@ class EditorMixin:
         self.show_mode(AGENT_MODE)
 
     def show_mode(self, mode: str) -> None:
-        """Show Agent tasks or the editor; the PDF click switch follows unless it is Off."""
+        """Show Agent tasks, the editor or the to-do list; the PDF click switch follows.
+
+        The to-do list belongs to no paper, so it leaves the click mode alone.
+        """
         self.mode_switch.set(mode)
         preview = getattr(self, "preview", None)  # the preview pane is built after this column
-        if preview is not None and preview.mode != "off":
+        if preview is not None and preview.mode != "off" and mode != TODO_MODE:
             preview.set_click_mode("source" if mode == EDITOR_MODE else "agent")
+        for widget in (self.panel, self.editor, self.todo):
+            widget.pack_forget()
         if mode == EDITOR_MODE:
-            self.panel.pack_forget()
             self.editor.pack(fill="both", expand=True)
             if self.editor.rel is None:
                 self.editor.paper_changed()
             self.editor.code.apply_theme()
+        elif mode == TODO_MODE:
+            self.todo.pack(fill="both", expand=True)
+            self.todo.on_show()
         else:
-            self.editor.pack_forget()
             self.panel.pack(fill="both", expand=True)
 
     def sync_middle_to_click_mode(self, click_mode: str) -> None:
@@ -119,7 +128,8 @@ class EditorMixin:
         return ProtectionPolicy.build(root, spec.read_only, spec.auto_protect_bib).reason(rel)
 
     def _editor_save_blocked(self) -> str | None:
-        if self._workflow_running() or self._todo_busy:
+        # Only the paper's own workflows matter: the to-do list has its own repository.
+        if self._workflow_running():
             return "A task is running - save when it has finished (your text is kept)."
         return None
 

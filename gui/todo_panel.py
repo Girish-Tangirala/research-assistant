@@ -1,4 +1,8 @@
-"""The shared To-Do tab (backed by ``todo.md`` in the selected paper's repository)."""
+"""The shared To-Do tab: one list for every paper, backed by its own repository.
+
+Each task may name the paper it belongs to, so the list still says what belongs
+where without being tied to one manuscript. See :mod:`core.global_todos`.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +21,12 @@ from gui.dialogs import _Dialog, run_in_background
 
 MUTED, OVERDUE, DONE = "#8b949e", "#f85149", "#3fb950"
 FILTERS = ("Open", "Mine", "Overdue", "Done", "All")
-AUTO_REFRESH_MS = 5 * 60 * 1000
+ALL_PAPERS = "All papers"
+NO_PAPER = "(no paper)"
+# The list has a repository to itself, so refreshing is one small fetch: often enough
+# to feel live without hammering the server.
+AUTO_REFRESH_MS = 45 * 1000
+FOCUS_REFRESH_SECONDS = 20      # coming back to the window re-checks, but not on every click
 
 
 @dataclass
@@ -25,18 +34,18 @@ class TodoContext:
     """What the To-Do tab needs from the main window."""
 
     make_store: Callable[[], TodoStore]          # raises TodoError with a user-facing reason
-    is_busy: Callable[[], bool]                  # True while a workflow uses the repository
     load_sections: Callable[[], list[str]]
     notify: Callable[[EventKind, str], None]
     handle_error: Callable[[Exception], None]
-    set_todo_busy: Callable[[bool], None]
+    paper_names: Callable[[], list[str]] = list  # every paper in the app, for tagging and filtering
+    current_paper: Callable[[], str] = str       # the selected paper, used as the default tag
 
 
 class TodoEditDialog(_Dialog):
-    """Edit one task's text, assignee, due date and section."""
+    """Edit one task's text, assignee, due date, paper and section."""
 
     def __init__(self, master: Any, item: TodoItem, people: list[str], sections: list[str],
-                 on_save: Callable[[dict[str, Any]], None]) -> None:
+                 papers: list[str], on_save: Callable[[dict[str, Any]], None]) -> None:
         super().__init__(master, "Edit task", "Edit task", f"Created by {item.by or 'unknown'} on {item.created}.")
         self.on_save = on_save
         self.text = self.entry("Task", item.text)
@@ -46,6 +55,11 @@ class TodoEditDialog(_Dialog):
         self.assignee.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
         self.due = self.entry("Due date (YYYY-MM-DD)", item.due, placeholder="optional")
+        self.label("Paper")
+        self.paper = ctk.CTkComboBox(self.body, values=[""] + papers, width=460)
+        self.paper.set(item.paper)
+        self.paper.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
+        self._row += 1
         self.label("Section")
         self.section = ctk.CTkComboBox(self.body, values=[""] + sections, width=460)
         self.section.set(item.section)
@@ -55,7 +69,7 @@ class TodoEditDialog(_Dialog):
 
     def submit(self) -> None:
         fields = {"text": self.text.get(), "assignee": self.assignee.get(), "due": self.due.get(),
-                  "section": self.section.get()}
+                  "paper": self.paper.get(), "section": self.section.get()}
         if not fields["text"].strip():
             self.fail("The task text cannot be empty.")
             return
@@ -83,44 +97,61 @@ class TodoPanel(ctk.CTkFrame):
         self.filter = ctk.CTkSegmentedButton(bar, values=list(FILTERS), command=lambda _v: self.render())
         self.filter.set("Open")
         self.filter.pack(side="left", padx=10)
-        self.status = ctk.CTkLabel(bar, text="", text_color=MUTED)
-        self.status.pack(side="left", padx=6)
+        self.paper_filter = ctk.CTkComboBox(bar, values=[ALL_PAPERS], width=150,
+                                            command=lambda _v: self.render())
+        self.paper_filter.set(ALL_PAPERS)
+        self.paper_filter.pack(side="left", fill="x", expand=True)
+        # Its own line: beside the filters it was pushed off the edge of the narrow column.
+        self.status = ctk.CTkLabel(self, text="", text_color=MUTED, anchor="w")
+        self.status.pack(fill="x", pady=(0, 4))
 
-        captions = ctk.CTkFrame(self, fg_color="transparent")
-        captions.pack(fill="x")
-        for text, width, expand in (("New task", 0, True), ("Assign to", 150, False), ("Due date", 130, False),
-                                    ("Section", 160, False), ("", 70, False)):
-            ctk.CTkLabel(captions, text=text, width=width, anchor="w", text_color=MUTED).pack(
-                side="left", fill="x", expand=expand, padx=(0 if expand else 6, 0))
+        # Two rows on a grid: the middle column is narrow, and one row of six fixed-width
+        # widgets ran off the edge, hiding Section and the Add button.
+        ctk.CTkLabel(self, text="New task", anchor="w", text_color=MUTED).pack(fill="x")
         add = ctk.CTkFrame(self, fg_color="transparent")
-        add.pack(fill="x", pady=(0, 6))
+        add.pack(fill="x")
+        add.grid_columnconfigure(0, weight=1)
         self.new_text = ctk.CTkEntry(add, placeholder_text="New task, e.g. 'Update Fig. 3 with the new results'")
-        self.new_text.pack(side="left", fill="x", expand=True)
+        self.new_text.grid(row=0, column=0, sticky="ew")
         self.new_text.bind("<Return>", lambda _e: self.add())
-        self.new_assignee = ctk.CTkComboBox(add, values=[""], width=150)
-        self.new_assignee.set("")
-        self.new_assignee.pack(side="left", padx=(6, 0))
-        self.new_due = ctk.CTkEntry(add, placeholder_text="YYYY-MM-DD", width=130)
-        self.new_due.pack(side="left", padx=(6, 0))
-        self.new_section = ctk.CTkComboBox(add, values=[""], width=160)
-        self.new_section.set("")
-        self.new_section.pack(side="left", padx=(6, 0))
         self.add_button = ctk.CTkButton(add, text="Add", width=70, command=self.add)
-        self.add_button.pack(side="left", padx=(6, 0))
-        ctk.CTkLabel(self, text="Assignee and section are optional. The list lives in todo.md in the paper and is "
-                                "shared with everyone who syncs it.", text_color=MUTED, anchor="w").pack(fill="x")
+        self.add_button.grid(row=0, column=1, padx=(6, 0))
+
+        fields = ctk.CTkFrame(self, fg_color="transparent")
+        fields.pack(fill="x", pady=(4, 6))
+        self.new_assignee = ctk.CTkComboBox(fields, values=[""])
+        self.new_assignee.set("")
+        self.new_due = ctk.CTkEntry(fields, placeholder_text="YYYY-MM-DD")
+        self.new_paper = ctk.CTkComboBox(fields, values=[NO_PAPER])
+        self.new_paper.set(NO_PAPER)
+        self.new_section = ctk.CTkComboBox(fields, values=[""])
+        self.new_section.set("")
+        for column, (caption, widget) in enumerate((("Assign to", self.new_assignee), ("Due date", self.new_due),
+                                                    ("Paper", self.new_paper), ("Section", self.new_section))):
+            fields.grid_columnconfigure(column, weight=1, uniform="todo")
+            ctk.CTkLabel(fields, text=caption, anchor="w", text_color=MUTED).grid(
+                row=0, column=column, sticky="w", padx=(0 if column == 0 else 6, 0))
+            widget.grid(row=1, column=column, sticky="ew", padx=(0 if column == 0 else 6, 0))
+        ctk.CTkLabel(self, text="One list for all your papers. Everything except the task text is optional; "
+                                "naming a paper is\njust a label, so tasks that belong to no paper are fine too.",
+                     text_color=MUTED, anchor="w", justify="left").pack(fill="x")
 
         self.list = ctk.CTkScrollableFrame(self)
         self.list.pack(fill="both", expand=True, pady=(4, 0))
         self.list.grid_columnconfigure(1, weight=1)
         self.after(AUTO_REFRESH_MS, self._auto_refresh)
+        self.winfo_toplevel().bind("<FocusIn>", self._window_focused, add="+")
+
+    def _window_focused(self, _event: Any) -> None:
+        """Back from Overleaf or a colleague's message: pick up their changes."""
+        if self.winfo_ismapped() and time.monotonic() - self._last_sync > FOCUS_REFRESH_SECONDS:
+            self.refresh(quiet=True)
 
     # ------------------------------------------------------------------ #
     # Background operations
     # ------------------------------------------------------------------ #
     def _set_busy(self, busy: bool, message: str = "") -> None:
         self.busy = busy
-        self.ctx.set_todo_busy(busy)
         state = "disabled" if busy else "normal"
         for widget in (self.refresh_button, self.add_button):
             widget.configure(state=state)
@@ -131,11 +162,7 @@ class TodoPanel(ctk.CTkFrame):
                done_message: str = "") -> None:
         if self.busy:
             return
-        if self.ctx.is_busy():
-            if not quiet:
-                self.ctx.notify(EventKind.WARNING, "A workflow is using the paper - try the to-do list again when it "
-                                                   "has finished.")
-            return
+        # The list has its own repository, so a running workflow never blocks it.
         try:
             store = self.ctx.make_store()
         except TodoError as exc:
@@ -187,12 +214,28 @@ class TodoPanel(ctk.CTkFrame):
     # Actions
     # ------------------------------------------------------------------ #
     def paper_changed(self) -> None:
-        """Called when another paper is selected: show the local copy, sync when the tab is opened."""
-        self.doc = None
+        """Another paper was selected: the list stays, only its paper labels follow."""
         self.sections = []
         self.new_section.configure(values=[""])
-        self._last_sync = 0.0
-        self.status.configure(text="")
+        self._refresh_paper_choices()
+        if self.doc is None:
+            self._load_local_copy()
+        self.render()
+
+    def _refresh_paper_choices(self) -> None:
+        papers = self.ctx.paper_names()
+        self.paper_filter.configure(values=[ALL_PAPERS] + papers)
+        if self.paper_filter.get() not in [ALL_PAPERS] + papers:
+            self.paper_filter.set(ALL_PAPERS)
+        self.new_paper.configure(values=[NO_PAPER] + papers)
+        current = self.ctx.current_paper()
+        if current in papers:            # new tasks default to the paper you are working on
+            self.new_paper.set(current)
+        elif self.new_paper.get() not in [NO_PAPER] + papers:
+            self.new_paper.set(NO_PAPER)
+
+    def _load_local_copy(self) -> None:
+        """Show the last synced copy straight away, before the network answers."""
         try:
             store = self.ctx.make_store()
             self.me = store.author
@@ -201,13 +244,14 @@ class TodoPanel(ctk.CTkFrame):
                 self.status.configure(text="Local copy - not synced yet")
         except (TodoError, OSError):
             pass
-        self.render()
-        if self.winfo_ismapped():
-            self.refresh(quiet=True)
 
     def on_show(self) -> None:
         """The To-Do tab was opened: sync if the list is older than a minute."""
         self._ensure_sections()
+        self._refresh_paper_choices()
+        if self.doc is None:
+            self._load_local_copy()
+            self.render()
         if time.monotonic() - self._last_sync > 60:
             self.refresh(quiet=self.doc is not None)
 
@@ -218,14 +262,16 @@ class TodoPanel(ctk.CTkFrame):
 
     def prefill(self, section: str) -> None:
         """Start a new task linked to ``section`` (from a click in the PDF)."""
-        self._ensure_sections()
+        self.on_show()
+        self._refresh_paper_choices()     # the click came from a paper, so tag the task with it
         self.new_section.set(section)
         self.new_text.focus_set()
 
     def add(self) -> None:
         text, assignee = self.new_text.get(), self.new_assignee.get()
         due, section = self.new_due.get(), self.new_section.get()
-        self._apply(lambda me: op_add(text, me, assignee, due, section), f"Task added: {text.strip()[:60]}")
+        paper = "" if self.new_paper.get() == NO_PAPER else self.new_paper.get()
+        self._apply(lambda me: op_add(text, me, assignee, due, section, paper), f"Task added: {text.strip()[:60]}")
         for entry in (self.new_text, self.new_due):
             if entry.get():  # deleting an empty entry would also remove its placeholder hint
                 entry.delete(0, "end")
@@ -239,7 +285,7 @@ class TodoPanel(ctk.CTkFrame):
 
     def edit(self, item: TodoItem) -> None:
         self._ensure_sections()
-        TodoEditDialog(self, item, self.people, self.sections,
+        TodoEditDialog(self, item, self.people, self.sections, self.ctx.paper_names(),
                        lambda fields: self._apply(lambda me: op_update(item.id, me, **fields),
                                                   f"Task updated: {fields['text'][:60]}"))
 
@@ -254,6 +300,11 @@ class TodoPanel(ctk.CTkFrame):
         items = self.doc.items if self.doc else []
         mode = self.filter.get()
         me = (self.me or "").lower()
+        paper = self.paper_filter.get()
+        if paper == NO_PAPER:
+            items = [i for i in items if not i.paper]
+        elif paper != ALL_PAPERS:
+            items = [i for i in items if i.paper == paper]
         if mode == "Open":
             items = [i for i in items if not i.done]
         elif mode == "Mine":
@@ -269,7 +320,7 @@ class TodoPanel(ctk.CTkFrame):
             child.destroy()
         items = self.visible_items()
         if self.doc is None:
-            ctk.CTkLabel(self.list, text="Click ⟳ Refresh to load the paper's shared to-do list.",
+            ctk.CTkLabel(self.list, text="Click ⟳ Refresh to load the shared to-do list.",
                          text_color=MUTED).grid(row=0, column=0, columnspan=4, sticky="w", padx=8, pady=8)
             return
         if not items:
@@ -287,6 +338,7 @@ class TodoPanel(ctk.CTkFrame):
                          font=ctk.CTkFont(overstrike=item.done)).grid(row=row * 2, column=1, sticky="w", pady=(6, 0))
             details = [f"@{item.assignee}" if item.assignee else "unassigned",
                        f"due {item.due}" + (" (overdue)" if item.is_overdue(today) else "") if item.due else "",
+                       f"in {item.paper}" if item.paper else "",
                        f"§ {item.section}" if item.section else "",
                        f"added by {item.by}" if item.by else "",
                        f"done by {item.done_by}" if item.done and item.done_by else ""]

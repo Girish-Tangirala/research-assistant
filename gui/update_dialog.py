@@ -132,8 +132,11 @@ class UpdateMixin:
         run_in_background(self, lambda: check(__version__, UPDATE_REPO), done, failed)
 
     def update_blocked(self) -> str | None:
-        if self._workflow_running() or self._todo_busy:
+        if self._workflow_running():
             return "A task is running - update when it has finished."
+        # Restarting mid-push would abort it; the to-do panel knows when it is mid-operation.
+        if getattr(getattr(self, "todo", None), "busy", False):
+            return "The to-do list is saving - update when it has finished."
         return None
 
     def quit_for_update(self, launch: Callable[[], None]) -> bool:

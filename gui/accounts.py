@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from core.app_state import PaperSpec
-from core.credentials import CredentialError, mask
+from core.credentials import CredentialError, host_of, mask
 from core.events import EventKind
 from gui.dialogs import ClaudeLoginDialog, GitLoginDialog, OpenAlexKeyDialog
 from gui.menubar import AccountSection
@@ -39,6 +39,7 @@ class AccountsMixin:
         sections.append(AccountSection(status, [
             ("Change token…" if cred else "Sign in…", self._login_git, bool(host)),
             ("Sign out", self._logout_git, bool(cred))]))
+        sections += self._todo_host_section(host)
 
         oa = self._safe(self.store.get_openalex_key)
         sections.append(AccountSection(
@@ -47,6 +48,43 @@ class AccountsMixin:
              ("Remove key", self._logout_openalex, bool(oa))]))
         sections.append(self._sharepoint_section())
         return sections
+
+    def _todo_host_section(self, paper_host: str) -> list[AccountSection]:
+        """Sign-in for the shared to-do repository, when it is on another host than the paper.
+
+        Without this there is no way to sign in to, say, github.com while every
+        paper is on Overleaf.
+        """
+        settings = self.app_state.todo_repo
+        host = host_of(settings.url) if settings.configured else ""
+        if not host or host == paper_host:
+            return []
+        cred = self._safe(lambda: self.store.get_git(host))
+        status = (f"Shared to-do list ({host}): signed in as {cred.username}" if cred
+                  else f"Shared to-do list ({host}): not signed in")
+        return [AccountSection(status, [
+            ("Change token…" if cred else "Sign in…", self._login_todo_git, True),
+            ("Sign out", self._logout_todo_git, bool(cred))])]
+
+    def _login_todo_git(self) -> None:
+        settings = self.app_state.todo_repo
+        host = host_of(settings.url)
+
+        def done(ok: bool, name: str, email: str) -> None:
+            if ok:
+                self.app_state.author_name, self.app_state.author_email = name, email
+                self._save_state()
+                self.todo.refresh()
+
+        GitLoginDialog(self, self.store, host, settings.url, self.app_state.author_name,
+                       self.app_state.author_email, done,
+                       reason="This token is used only for the shared to-do list.")
+
+    def _logout_todo_git(self) -> None:
+        host = host_of(self.app_state.todo_repo.url)
+        if host:
+            self._safe(lambda: self.store.clear_git(host))
+            self.panel.append(EventKind.INFO, f"Signed out of {host}.")
 
     def _ensure_claude(self, then: Callable[[], None], required: bool = True, reason: str = "") -> None:
         if not reason and self._safe(self.store.get_claude_key):

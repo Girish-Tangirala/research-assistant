@@ -27,7 +27,7 @@ from core.source_map import (
 )
 from core.synctex import find_synctex_tool
 from core.workflows import CitationAuditWorkflow, SafeEditWorkflow
-from gui.editor_mixin import AGENT_MODE
+from gui.editor_mixin import AGENT_MODE, TODO_MODE
 from gui.panels import open_path
 
 EDIT_TAB = SafeEditWorkflow.name
@@ -167,10 +167,8 @@ class PdfLinkMixin:
         self.panel.forms[REFERENCES_TAB].focus(target.section)
 
     def todo_at(self, target: ClickTarget) -> None:
-        self.show_mode(AGENT_MODE)
-        self.panel.tabs.set("To-Do")
-        self.panel.todo.on_show()
-        self.panel.todo.prefill(target.section)
+        self.show_mode(TODO_MODE)          # the list is its own column now, not a tab of the task panel
+        self.todo.prefill(target.section)
 
     def panel_sections(self) -> list[str]:
         root = self._paper_root()

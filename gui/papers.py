@@ -71,7 +71,7 @@ class PapersMixin:
                                            "of one you already have.")
         self._refresh_sync_status()
         self.panel.set_sections([])
-        self.panel.todo.paper_changed()
+        self.todo.paper_changed()
         self.preview_paper_changed()
         self.editor_paper_changed()
 

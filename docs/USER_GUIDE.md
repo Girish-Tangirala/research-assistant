@@ -35,7 +35,7 @@ The Research Assistant is a desktop app for writing LaTeX papers that live on Ov
    - Skipped it? **Help → Install Git / MiKTeX…** opens the window again.
 5. Tip: right-click the `.exe` → *Show more options* → **Send to → Desktop (create shortcut)**.
 
-**Updates arrive by themselves.** When a new version has been published, the app shows *Update available* at start, with what's new. Click **Update now**: it downloads the new version, checks it, closes, replaces itself and starts again in a few seconds. **Later** skips it until the next start, and **Help → Check for updates…** checks at any time. Your papers, settings and sign-ins are kept, because they are stored elsewhere (see section 10). Updating needs the app folder to be somewhere you can write to, such as Documents (not *Program Files*).
+**Updates arrive by themselves.** When a new version has been published, the app shows *Update available* at start, with what's new. Click **Update now**: it downloads the new version, checks it, closes, replaces itself and starts again in a few seconds. **Later** skips it until the next start, and **Help → Check for updates…** checks at any time. Your papers, settings and sign-ins are kept, because they are stored elsewhere (see section 12). Updating needs the app folder to be somewhere you can write to, such as Documents (not *Program Files*).
 
 ## 3. Signing in (once)
 
@@ -134,7 +134,37 @@ never leave your computer - only the numbers that end up in the figure travel wi
 
 **Shortcut from the PDF:** choose **Click in PDF: Agent task**. Clicking a paragraph then opens *Edit Text* for it, and clicking a figure opens *Replace a figure*. **Right-click** the PDF for every option.
 
-## 8. Sending your work to Overleaf: Sync
+## 8. The shared to-do list
+
+Click **☑ To-Do** in the middle switch, next to *Agent tasks* and *Edit .tex*. It is **one list for all
+your papers**, shared with everyone you work with.
+
+**Setting it up (once per computer)**
+
+1. On GitHub, create a new **private** repository - for example `research-todo` - and tick *Add a README*.
+2. Invite the people you work with (repository **Settings ▸ Collaborators**).
+3. In the app choose **Options ▸ Shared to-do list…** and paste the repository link.
+4. Sign in to GitHub under **Accounts** with your own token (*Contents: read and write* on that repository).
+
+**Using it**
+
+Type a task and press Enter. Assignee, due date, paper and section are all optional. Naming a paper is just
+a label that says where the task belongs - new tasks are labelled with the paper you have open, and tasks
+that belong to no paper are perfectly fine. Use the filters to see only open tasks, only yours, only
+overdue ones, or only one paper's.
+
+Changes are saved for everyone straight away - there is no approval window and no Sync for the to-do list,
+because it is not part of a paper. The list refreshes when you open it, when you come back to the window,
+when you click ⟳ Refresh, and every 45 seconds by itself. If two of you change the list at the same
+moment nothing is lost; for the same task, the last change wins.
+
+**If you used the old per-paper lists**
+
+Before version 1.3.0 each paper had its own to-do list. Choose **Options ▸ Move paper to-do lists into the
+shared list…** once: it copies those tasks over with their assignee, due date and state, and then removes
+`todo.md` from each paper. Press **Sync** on each paper afterwards so it disappears from Overleaf too.
+
+## 9. Sending your work to Overleaf: Sync
 
 Press **⇄ Sync with Overleaf** (left panel). The app:
 
@@ -146,7 +176,7 @@ The left panel shows how many changes are waiting. **⟳ Refresh** only fetches 
 
 If you and a co-author changed the **same lines**, nothing is sent and the app tells you. Sort it out in Overleaf, then Sync again.
 
-## 9. Backing up your data to OneDrive
+## 10. Backing up your data to OneDrive
 
 Your `data\` and `supplementary\` folders never go to Overleaf, so they are the only things with no second
 copy. Press **☁ Back up data** (left panel) to copy them into OneDrive.
@@ -189,7 +219,7 @@ uploading, so its icons are what confirm it:
 | Green tick or white cloud | uploaded and safe |
 | Red cross | OneDrive has a problem — open it and read the message |
 
-## 10. LaTeX errors
+## 11. LaTeX errors
 
 Like Overleaf, the app keeps building the PDF when LaTeX can recover from an error. In that case:
 
@@ -200,7 +230,7 @@ Only a serious error (for example a missing file) stops the PDF. The label turns
 
 When the AI changes your paper, it is only rolled back if it **adds a new** error. Errors that were already there don't block it.
 
-## 11. Where your files are
+## 12. Where your files are
 
 Everything is in the folder **`C:\Users\<you>\.research_agent`**:
 
@@ -218,7 +248,7 @@ Your Claude key and Overleaf token are in **Windows Credential Manager** (Contro
 
 **What is sent where:** for AI tasks, the text the task needs (for example one section) goes to Anthropic's Claude API. Editing, the PDF and the history stay on your computer; Sync talks only to Overleaf, and Back up data only copies into your own OneDrive folder.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Problem | What to do |
 |---|---|

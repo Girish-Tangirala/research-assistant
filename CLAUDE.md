@@ -66,6 +66,11 @@ python -m venv .venv
   history can't be merged with Overleaf.
 - The **.tex editor** (`gui/tex_editor.py`) commits every save locally. Sync and the agent refuse
   uncommitted trees, so never leave the editor's writes uncommitted.
+- **The to-do list is global, in its own repository** (`core/global_todos.py`, `AppState.todo_repo`), not in a
+  paper — decided 2026-09-29 so cross-paper tasks have a home and a to-do change never touches a manuscript.
+  It is the third setting of the middle switch. Each task may *name* a paper; that is only a label. Keep
+  `TodoStore` repository-agnostic. `migrate_paper_lists` moves an old per-paper `todo.md` in and deletes it
+  from the paper, committing locally so Sync still decides when Overleaf sees it; it is idempotent by task id.
 - **Files stay under 500 lines**; split into mixins/modules (see `gui/*_mixin.py`, `gui/pdf_links.py`).
 
 ## Pitfalls that cost time before

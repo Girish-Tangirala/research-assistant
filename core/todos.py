@@ -1,7 +1,7 @@
-"""Shared to-do list stored in the paper's repository (``todo.md``).
+"""Shared to-do list stored as ``todo.md`` in a Git repository.
 
-Everyone with access to the paper (Overleaf or GitHub) shares the list through
-the normal Git sync. The file stays human-readable - it can be ticked or edited
+Everyone with access to that repository shares the list through the normal Git
+sync. One list covers every paper: each task may name the paper it belongs to. The file stays human-readable - it can be ticked or edited
 in Overleaf - while each task line carries its metadata in an HTML comment::
 
     - [ ] Fix Fig. 3 caption — @Girish · due 2026-10-01 · § Results <!-- todo {"id": "7f3a1c", ...} -->
@@ -27,7 +27,7 @@ from core.git_manager import GitManager, GitOperationError
 from core.protection import SHARED_TODO_FILE as TODO_FILE
 HEADER = ("# To-do list\n\n"
           "<!-- Shared by the Research Assistant Agent app. One task per line: you can tick [x] or edit the task "
-          "text here in Overleaf; the app keeps the details in the comment at the end of each line. -->\n")
+          "text here in the browser; the app keeps the details in the comment at the end of each line. -->\n")
 COMMIT_PREFIX = "To-do: "
 MAX_ATTEMPTS = 3
 _TASK_RE = re.compile(r"^\s*[-*]\s+\[(?P<mark>[ xX])\]\s+(?P<body>.*?)\s*(?:<!--\s*todo\s+(?P<meta>\{.*\})\s*-->)?\s*$")
@@ -66,6 +66,7 @@ class TodoItem:
     assignee: str = ""
     due: str = ""
     section: str = ""
+    paper: str = ""
     by: str = ""
     created: str = field(default_factory=lambda: date.today().isoformat())
     done_by: str = ""
@@ -76,6 +77,7 @@ class TodoItem:
 
     def render(self) -> str:
         details = [f"@{self.assignee}" if self.assignee else "", f"due {self.due}" if self.due else "",
+                   f"in {self.paper}" if self.paper else "",
                    f"§ {self.section}" if self.section else "", f"done by {self.done_by}" if self.done and self.done_by else ""]
         visible = _clean(self.text) + (_SEPARATOR + " · ".join(d for d in details if d) if any(details) else "")
         meta = {k: v for k, v in asdict(self).items() if k not in {"text", "done"} and v}
@@ -93,7 +95,7 @@ class TodoItem:
                 meta = json.loads(match.group("meta"))
             except ValueError:
                 meta = {}
-            for key in ("id", "assignee", "due", "section", "by", "created", "done_by"):
+            for key in ("id", "assignee", "due", "section", "paper", "by", "created", "done_by"):
                 if isinstance(meta.get(key), str):
                     setattr(item, key, meta[key])
             body = body.split(_SEPARATOR, 1)[0]  # details after the separator are regenerated from meta
@@ -154,12 +156,13 @@ class TodoDoc:
 Operation = Callable[[TodoDoc], str]
 
 
-def op_add(text: str, author: str, assignee: str = "", due: str = "", section: str = "") -> Operation:
+def op_add(text: str, author: str, assignee: str = "", due: str = "", section: str = "",
+           paper: str = "") -> Operation:
     text = _clean(text)
     if not text:
         raise TodoError("Enter the task text.")
     item = TodoItem(text=text, assignee=_clean(assignee), due=validate_due(due), section=_clean(section),
-                    by=_clean(author))
+                    paper=_clean(paper), by=_clean(author))
 
     def apply(doc: TodoDoc) -> str:
         doc.add(TodoItem(**asdict(item)))

@@ -21,6 +21,26 @@ def _show_error(title: str, message: str) -> None:
     root.destroy()
 
 
+def _become_dpi_aware() -> None:
+    """Tell Windows we handle scaling, before Tk reads the screen.
+
+    Without this Tk sees a 1920x1080 screen at 125% as 1536x864, so a full-screen
+    window covers only that much and a quarter of the screen stays empty.
+    CustomTkinter scales the widgets itself, so the app is drawn at the right size.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)      # per-monitor aware
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()        # older Windows
+        except Exception:
+            pass                                            # not fatal: the app still runs
+
+
 def _put_git_on_path() -> None:
     """GitPython runs ``git``: put the one we found (installed, or our PortableGit) on PATH.
 
@@ -35,6 +55,7 @@ def _put_git_on_path() -> None:
 
 
 def main() -> None:
+    _become_dpi_aware()
     _put_git_on_path()
     try:
         from gui.app import run

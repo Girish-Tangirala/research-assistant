@@ -51,13 +51,17 @@ class MenuActions:
     user_guide: Callable[[], None] | None = None
     setup_tools: Callable[[], None] | None = None
     check_updates: Callable[[], None] | None = None
+    todo_repo: Callable[[], None] | None = None
+    migrate_todos: Callable[[], None] | None = None
+    toggle_fullscreen: Callable[[], None] | None = None
 
 
 class AppMenuBar:
     """Builds and owns the window's menu bar."""
 
     def __init__(self, root: tk.Misc, actions: MenuActions, options: list[tuple[str, tk.BooleanVar]],
-                 appearance: tk.StringVar, preview_visible: tk.BooleanVar) -> None:
+                 appearance: tk.StringVar, preview_visible: tk.BooleanVar,
+                 fullscreen: tk.BooleanVar | None = None) -> None:
         self.actions = actions
         self.bar = tk.Menu(root, tearoff=False)
 
@@ -87,9 +91,19 @@ class AppMenuBar:
         options_menu = tk.Menu(self.bar, tearoff=False)
         for label, var in options:
             options_menu.add_checkbutton(label=label, variable=var, command=actions.options_changed)
+        if actions.todo_repo is not None:
+            options_menu.add_separator()
+            options_menu.add_command(label="Shared to-do list\u2026", command=actions.todo_repo)
+        if actions.migrate_todos is not None:
+            options_menu.add_command(label="Move paper to-do lists into the shared list\u2026",
+                                     command=actions.migrate_todos)
         self.bar.add_cascade(label="Options", menu=options_menu, underline=0)
 
         view_menu = tk.Menu(self.bar, tearoff=False)
+        if fullscreen is not None and actions.toggle_fullscreen is not None:
+            # Discoverable way back: fullscreen hides the title bar, so there is no close button.
+            view_menu.add_checkbutton(label="Full screen", variable=fullscreen,
+                                      command=actions.toggle_fullscreen, accelerator="F11")
         view_menu.add_checkbutton(label="Show PDF preview", variable=preview_visible,
                                   command=actions.toggle_preview, accelerator="Ctrl+P")
         view_menu.add_command(label="Recompile PDF", command=actions.recompile, accelerator="F6")

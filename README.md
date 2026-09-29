@@ -18,7 +18,7 @@ Nothing in your paper changes until you approve the diff, and nothing reaches Ov
 The window opens maximised, in three columns:
 
 - **Left, narrow:** paper selector and details, **Sync with Overleaf**, **Refresh**, **Folder**.
-- **Middle:** a switch between **🤖 Agent tasks** (task dropdown, parameters, Run, and the Live Log / Report / To-Do tabs) and **✎ Edit .tex** (the source editor).
+- **Middle:** a switch between **🤖 Agent tasks** (task dropdown, parameters, Run, and the Live Log / Report tabs), **✎ Edit .tex** (the source editor) and **☑ To-Do** (the shared to-do list for all papers).
 - **Right, about 60% of the width:** the PDF preview. Drag the divider to resize it.
 
 ## Features
@@ -154,26 +154,39 @@ In **Agent task** mode:
 
 ## Shared to-do list
 
-The **To-Do** tab (next to Live Log and Report) shows a to-do list for the selected paper, shared with everyone who works on it.
+**☑ To-Do** is the third setting of the middle switch, next to *Agent tasks* and *Edit .tex*. It is **one
+list for all your papers**, shared with everyone you work with.
 
-- **Where it lives:** `todo.md` in the paper's repository, so anyone who can sync the paper (Overleaf or GitHub) sees the same list; no extra accounts or servers. It's readable in Overleaf, where you can tick `[x]` or reword a task directly.
+- **Where it lives:** `todo.md` in a small Git repository of its own, set under **Options ▸ Shared to-do
+  list…**. Because it is not a paper, a to-do change never touches a manuscript and never waits for
+  **Sync**. The file stays readable on the hosting site, where you can tick `[x]` or reword a task by hand.
+- **Setting it up (once):** create an empty private repository (tick *Add a README*), invite the people you
+  work with, paste the link into that dialog, and sign in to the host under **Accounts**. Each person uses
+  their own token.
 - **What you can do:**
-  - add tasks with an optional assignee, due date and section;
+  - add tasks with an optional assignee, due date, **paper** and section;
   - tick tasks off, edit them or delete them;
-  - filter by **Open / Mine / Overdue / Done / All**. "Mine" means tasks assigned to the name you use for Git.
+  - filter by **Open / Mine / Overdue / Done / All**, and by paper. "Mine" means tasks assigned to the name
+    you use for Git.
+- **Naming a paper is only a label.** New tasks default to the paper you have open, tasks that belong to no
+  paper are fine, and changing paper does not change the list - only which tasks the paper filter shows.
 - **Saving:** each change is committed and pushed at once (`To-do: add '…'`), with no approval window.
-  - **Someone pushed first:** the app pulls again, re-applies your change and retries, so simultaneous edits are not lost. For the same task, the last change wins.
-  - **Push is off (Options menu):** the change stays on your computer.
+  - **Someone pushed first:** the app pulls again, re-applies your change and retries, so simultaneous
+    edits are not lost. For the same task, the last change wins.
 - **When it updates:**
   - when you open the tab (if the list is more than a minute old);
-  - when you click ⟳ Refresh;
-  - every 5 minutes in the background, silently and only while no workflow is running.
+  - when the window regains focus, and when you click ⟳ Refresh;
+  - every 45 seconds in the background. A workflow no longer blocks it - it is a different repository.
 - **Protection:** the AI agent can never edit `todo.md`.
+- **Moving an older per-paper list in:** until 1.2.0 each paper carried its own `todo.md`. **Options ▸ Move
+  paper to-do lists into the shared list…** copies those tasks over - keeping their id, assignee, due date
+  and state - and then deletes `todo.md` from each paper. That deletion is committed locally, so press
+  **Sync** on each paper to remove it from Overleaf too. Tasks already moved are skipped, so running it
+  twice is safe.
 - **Limits:**
-  - one list per paper;
-  - updates arrive on sync, not instantly;
-  - every change appears as a small commit in the Overleaf/GitHub history;
-  - on GitHub, the default branch must accept direct pushes.
+  - updates arrive on a refresh, not instantly;
+  - every change appears as a small commit in that repository's history;
+  - the default branch must accept direct pushes.
 
 ## Sign-in (once, inside the app)
 
@@ -388,6 +401,7 @@ core/
   references.py         → identifier resolution, de-duplication, BibTeX, \bibliography wiring
   registry.py           → workflow tab order
   todos.py              → shared todo.md: format, operations, replay-on-conflict syncing
+  global_todos.py       → the shared list's own repository, and moving old per-paper lists into it
   project_layout.py     → folder structure of a new local paper + starter files
   reorganize.py         → sort an existing paper into those folders, rewriting LaTeX paths
   git_sync.py           → the Sync button: fetch, counts, replay local commits, push
@@ -408,7 +422,8 @@ gui/
   papers.py             → paper list, add/edit dialogs, folder setup, sync status
   task_forms.py         → one parameter form per tab (file pickers, section pickers)
   results_form.py       → the Results Figures & Tables form (file/folder picker, chart kind)
-  todo_panel.py         → the To-Do tab (filters, add/edit/tick/delete, auto-refresh)
+  todo_panel.py         → the To-Do column (filters by state and paper, add/edit/tick/delete, auto-refresh)
+  todo_setup.py         → the shared-list settings dialog and the one-off migration
   accounts.py           → sign-in handling (Accounts menu, sign-in prompts)
   sharepoint.py         → backup settings dialog, progress window, the Back up data action
   preview_pane.py       → PDF preview pane, push confirmation, recompile/auto-recompile glue

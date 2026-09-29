@@ -28,15 +28,17 @@ from config import AppConfig
 from version import __version__
 from core.agent_engine import AgentEngine, EngineCredentials, RunOptions, WorkflowState, with_identity
 from core.app_state import AppState, PaperSpec
-from core.credentials import CredentialStore
+from core.credentials import CredentialStore, host_of
 from core.dependencies import missing_tools
 from core.events import AgentEvent, ApprovalGate, CancelledError, CancelToken, EventBus, EventKind
 from core.git_manager import GitAuthError, GitManager, git_global_identity
+from core.global_todos import open_store
 from core.llm_client import LLMAuthError
 from core.registry import WORKFLOWS
 from core.todos import TodoError, TodoStore
 from core.workflows import BaseWorkflow, SyncWorkflow
 from gui.accounts import AccountsMixin
+from gui.dialogs import real_screen_size
 from gui.diff_window import DiffWindow
 from gui.editor_mixin import EditorMixin
 from gui.setup_dialog import SetupDialog
@@ -48,6 +50,7 @@ from gui.pdf_links import PdfLinkMixin
 from gui.preview_pane import PreviewMixin
 from gui.sharepoint import SharePointMixin
 from gui.todo_panel import TodoContext
+from gui.todo_setup import TodoSetupMixin
 
 logger = logging.getLogger("research_agent")
 MUTED = "#8b949e"
@@ -55,8 +58,8 @@ SIDEBAR_WIDTH = 172   # narrow, so the PDF gets the room
 WRAP = SIDEBAR_WIDTH - 34   # labels sit inside a padded frame
 
 
-class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixin, EditorMixin, UpdateMixin,
-                           SharePointMixin, ctk.CTk):
+class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixin,
+                           EditorMixin, UpdateMixin, SharePointMixin, ctk.CTk):
     """Main application window."""
 
     def __init__(self, config: AppConfig, store: CredentialStore | None = None) -> None:
@@ -73,26 +76,29 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
         self.cancel_token: CancelToken | None = None
         self.gate: ApprovalGate | None = None
         self.worker: threading.Thread | None = None
-        self._todo_busy = False
 
         self.title("Scientific Research Assistant Agent")
-        self.geometry("1600x900")
-        self.minsize(1100, 650)
-        if self.tk.call("tk", "windowingsystem") == "win32":
-            self.after(0, lambda: self.state("zoomed"))  # start maximised: the PDF needs the room
+        # The windowed size is what F11 restores to; it must fit a small screen too.
+        screen_w, screen_h = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"{min(1600, screen_w - 80)}x{min(900, screen_h - 80)}")
+        self.minsize(min(1100, screen_w - 40), min(650, screen_h - 40))
+        self._fullscreen = False
+        self.after(0, lambda: self.set_fullscreen(True))   # the PDF needs the room
+        self.bind("<F11>", lambda _e: self.toggle_fullscreen())
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self._build_sidebar()
         self._build_menubar()
-        todo = TodoContext(make_store=self._todo_store, is_busy=self._workflow_running,
-                           load_sections=self._load_sections, notify=self.panel_log,
-                           handle_error=self._todo_error, set_todo_busy=self._set_todo_busy)
+        todo = TodoContext(make_store=self._todo_store, load_sections=self._load_sections,
+                           notify=self.panel_log, handle_error=self._todo_error,
+                           paper_names=lambda: list(self.app_state.names),
+                           current_paper=lambda: self.app_state.current.name if self.app_state.current else "")
         self.split = self._build_split()
         self.middle = self._build_middle(self.split)
         self.panel = TaskPanel(self.middle, list(WORKFLOWS), run=self._run_selected, cancel=self._cancel,
-                               load_sections=self._load_sections, list_bibs=self._list_bibs, todo=todo,
+                               load_sections=self._load_sections, list_bibs=self._list_bibs,
                                list_figures=self._list_figures)
-        self._attach_editor(self.middle)
+        self._attach_editor(self.middle, todo)
         self._attach_preview()
         self._refresh_papers()
         for problem in config.validate():
@@ -101,6 +107,30 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(50, self._poll_events)
         self.after(400, self._startup)
+
+    # ------------------------------------------------------------------ #
+    # Window
+    # ------------------------------------------------------------------ #
+    def toggle_fullscreen(self) -> None:
+        self.set_fullscreen(not self._fullscreen)
+
+    def set_fullscreen(self, on: bool) -> None:
+        """Fullscreen hides the title bar, so F11 and View ▸ Full screen toggle it back."""
+        self._fullscreen = on
+        if hasattr(self, "fullscreen_var"):
+            self.fullscreen_var.set(on)
+        try:
+            self.attributes("-fullscreen", on)
+        except Exception:                       # not supported by this window manager
+            self._fullscreen = False
+            if self.tk.call("tk", "windowingsystem") == "win32":
+                self.state("zoomed")
+            return
+        if on:
+            width, height = real_screen_size(self)
+            self.after_idle(lambda: self.geometry(f"{width}x{height}+0+0"))
+        elif self.tk.call("tk", "windowingsystem") == "win32":
+            self.state("zoomed")                # leaving fullscreen: stay maximised, not tiny
 
     # ------------------------------------------------------------------ #
     # Sidebar
@@ -156,6 +186,7 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
         self.preview_var = ctk.BooleanVar(value=self.app_state.preview)
         self.confirm_var = ctk.BooleanVar(value=self.app_state.confirm_push)
         self.preview_visible_var = ctk.BooleanVar(value=self.app_state.show_preview)
+        self.fullscreen_var = ctk.BooleanVar(value=True)
         self.menubar = AppMenuBar(
             self,
             MenuActions(
@@ -171,6 +202,9 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
                 appearance_changed=self._set_appearance, about=self._about,
                 toggle_preview=self.toggle_preview, recompile=self.recompile_preview,
                 user_guide=self._open_user_guide, setup_tools=lambda: self._check_tools(None, always=True),
+                todo_repo=self._edit_todo_repo,
+                migrate_todos=self._migrate_todo_lists,
+                toggle_fullscreen=lambda: self.set_fullscreen(self.fullscreen_var.get()),
                 check_updates=lambda: self.check_for_updates(verbose=True),
             ),
             options=[("Send to Overleaf right after each approval (off: use the Sync button)", self.push_var),
@@ -179,6 +213,7 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
                      ("Preview changes before approval", self.preview_var),
                      ("Use Claude web search", self.web_var)],
             appearance=self.appearance_var, preview_visible=self.preview_visible_var,
+            fullscreen=self.fullscreen_var,
         )
 
     def _set_appearance(self, mode: str) -> None:
@@ -245,9 +280,6 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
     def _start(self, workflow_cls: type[BaseWorkflow], params: dict[str, Any]) -> None:
         if self._workflow_running():
             self.panel.append(EventKind.WARNING, "A workflow is already running.")
-            return
-        if self._todo_busy:
-            self.panel.append(EventKind.WARNING, "The to-do list is syncing - try again in a moment.")
             return
         spec = self.app_state.current
         if spec is None:
@@ -375,25 +407,18 @@ class ResearchAssistantApp(AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixi
     def panel_log(self, kind: EventKind, message: str) -> None:
         self.panel.append(kind, message)
 
-    def _set_todo_busy(self, busy: bool) -> None:
-        self._todo_busy = busy
-        self.sync_button.configure(state="disabled" if busy or self._workflow_running() else "normal")
-
     def _todo_store(self) -> TodoStore:
-        """Store for the selected paper (raises TodoError with a user-facing reason)."""
-        spec = self.app_state.current
-        if spec is None:
-            raise TodoError("Add a paper first.")
-        host, _ = self._paper_host(spec)
+        """Store for the shared list (raises TodoError with a user-facing reason).
+
+        One list for every paper, in its own repository - see :mod:`core.global_todos`.
+        """
+        settings = self.app_state.todo_repo
+        host = host_of(settings.url) if settings.configured else ""
         credential = self._safe(lambda: self.store.get_git(host)) if host else None
-        if host and credential is None:
-            raise TodoError(f"Sign in to {host} (Accounts menu) to use the shared to-do list.")
         config = with_identity(self.config_, self.app_state.author_name, self.app_state.author_email)
-        local = spec.local_path.strip() or str(self.config_.papers_dir / spec.name)
-        git = GitManager(Path(local), spec.remote_url, spec.branch, config.git, credential=credential,
-                         log=lambda m: self.bus.emit(EventKind.INFO, m))
-        return TodoStore(git, config.git.author_name, push=self.push_var.get(),
-                         log=lambda m: self.bus.emit(EventKind.WARNING, m))
+        return open_store(self.config_.workspace, settings, config.git.author_name,
+                          credential=credential, git_settings=config.git,
+                          log=lambda m: self.bus.emit(EventKind.INFO, m))
 
     def _todo_error(self, exc: Exception) -> None:
         if isinstance(exc, GitAuthError):

@@ -15,7 +15,6 @@ import customtkinter as ctk
 
 from core.events import EventKind
 from gui.task_forms import FORMS, Form, FormContext
-from gui.todo_panel import TodoContext, TodoPanel
 
 LOG_COLORS = {
     EventKind.INFO: "#c9d1d9", EventKind.STATE: "#d2a8ff", EventKind.THOUGHT: "#8b949e",
@@ -44,7 +43,7 @@ class TaskPanel(ctk.CTkFrame):
 
     def __init__(self, master: Any, task_names: list[str], run: Callable[[str, dict[str, Any]], None],
                  cancel: Callable[[], None], load_sections: Callable[[], list[str]],
-                 list_bibs: Callable[[], list[str]], todo: TodoContext,
+                 list_bibs: Callable[[], list[str]],
                  list_figures: Callable[[], list[Any]] = list) -> None:
         super().__init__(master, fg_color="transparent")
         self._run = run
@@ -80,7 +79,7 @@ class TaskPanel(ctk.CTkFrame):
         self.progress.pack(side="right", padx=8)
         self.progress.set(0)
 
-        self.tabs = ctk.CTkTabview(self, command=self._tab_changed)
+        self.tabs = ctk.CTkTabview(self)
         self.tabs.grid(row=3, column=0, sticky="nsew", pady=(10, 0))
         mono = ctk.CTkFont(family="Consolas", size=13)
         self.log_box = ctk.CTkTextbox(self.tabs.add("Live Log"), font=mono, wrap="word")
@@ -102,13 +101,7 @@ class TaskPanel(ctk.CTkFrame):
         self.report_box.pack(fill="both", expand=True)
         self.report_box.tag_config("link", foreground="#58a6ff", underline=True)
         self.report_box.tag_config("heading", foreground="#d2a8ff")
-        self.todo = TodoPanel(self.tabs.add("To-Do"), todo)
-        self.todo.pack(fill="both", expand=True)
         self.select(task_names[0])
-
-    def _tab_changed(self) -> None:
-        if self.tabs.get() == "To-Do":
-            self.todo.on_show()
 
     # ------------------------------------------------------------------ #
     # Parameters

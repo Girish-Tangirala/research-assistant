@@ -294,7 +294,7 @@ class PreviewMixin:
         builder = self._preview_builder()
         if self._preview_busy:
             return
-        if self._workflow_running() or self._todo_busy:
+        if self._workflow_running():      # the to-do list is a different repository and never conflicts
             if not quiet:
                 self.panel.append(EventKind.WARNING, "The paper is busy - recompile when the current task is done.")
             return
@@ -325,7 +325,7 @@ class PreviewMixin:
         try:
             root = self._paper_root()
             if (self.preview.auto.get() and root and root.is_dir() and not self._preview_busy
-                    and not self._workflow_running() and not self._todo_busy
+                    and not self._workflow_running()
                     and source_signature(root) != self._last_signature):
                 self.recompile_preview(quiet=True)
         finally:

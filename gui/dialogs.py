@@ -30,6 +30,43 @@ OK = "#3fb950"
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+def real_screen_size(widget: Any) -> tuple[int, int]:
+    """The screen in real pixels, which Tk here does not always know.
+
+    On a display at 125% this Tk reports 1536x864 for a 1920x1080 screen, so
+    ``-fullscreen`` sizes the window to the smaller figure and leaves a quarter
+    of the screen empty. Windows itself is asked instead, and the value is passed
+    to ``geometry()`` unchanged: CustomTkinter's scaling and Tk's virtualisation
+    cancel out, so what goes in is what appears on the screen.
+    """
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        width, height = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+        if width > 0 and height > 0:
+            return width, height
+    except Exception:      # not Windows, or the call is unavailable
+        pass
+    return widget.winfo_screenwidth(), widget.winfo_screenheight()
+
+
+def window_scaling(widget: Any) -> float:
+    """What CustomTkinter multiplies the size given to ``geometry()`` by.
+
+    On a display at 125% it is 1.25, so asking for 900 produces a 1125-pixel
+    window - which is how a window ends up larger (or smaller) than intended.
+    Tk measures in real pixels, so sizes must be divided by this before being
+    handed to ``geometry()``.
+    """
+    try:
+        from customtkinter.windows.widgets.scaling import ScalingTracker
+
+        return float(ScalingTracker.get_window_scaling(widget)) or 1.0
+    except Exception:      # older CustomTkinter, or no scaling support
+        return 1.0
+
+
 def run_in_background(widget: Any, fn: Callable[[], Any], on_success: Callable[[Any], None],
                       on_error: Callable[[Exception], None]) -> None:
     """Run ``fn`` off the UI thread and deliver the outcome on the UI thread."""
@@ -56,24 +93,83 @@ def run_in_background(widget: Any, fn: Callable[[], Any], on_success: Callable[[
 
 
 class _Dialog(ctk.CTkToplevel):
-    """Base modal dialog with a status line and a button row."""
+    """Base modal dialog with a status line and a button row.
+
+    A dialog never assumes it fits on the screen. The buttons and the status line
+    are packed against the bottom *before* the body, so ``pack`` gives them their
+    space first and they can never be squeezed off; the body scrolls; and the
+    window is clamped to the display it opens on. A colleague's smaller screen
+    once pushed Save and Cancel off the bottom of *Add paper*, with the dialog
+    fixed-size so there was no way to reach them.
+    """
+
+    MAX_WIDTH_FRACTION = 0.95
+    MAX_HEIGHT_FRACTION = 0.85
+    MIN_WIDTH = 520
+    MIN_HEIGHT = 220
 
     def __init__(self, master: Any, title: str, heading: str, text: str) -> None:
         super().__init__(master)
         self.title(title)
-        self.resizable(False, False)
+        self.resizable(False, True)      # the height can be adjusted on a short screen
         self.transient(master)
-        self.body = ctk.CTkFrame(self, fg_color="transparent")
-        self.body.pack(fill="both", expand=True, padx=20, pady=16)
+        self.status = ctk.CTkLabel(self, text="", wraplength=460, justify="left")
+        self.buttons = ctk.CTkFrame(self, fg_color="transparent")
+        self.buttons.pack(side="bottom", fill="x", padx=20, pady=(8, 16))
+        self.status.pack(side="bottom", fill="x", padx=20)
+        self.body = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.body.pack(side="top", fill="both", expand=True, padx=14, pady=(16, 0))
         self.body.grid_columnconfigure(0, weight=1)
         self._row = 0
         self.label(heading, font=ctk.CTkFont(size=17, weight="bold"))
         if text:
             self.label(text, color=MUTED)
-        self.status = ctk.CTkLabel(self, text="", wraplength=460, justify="left")
-        self.buttons = ctk.CTkFrame(self, fg_color="transparent")
         self.protocol("WM_DELETE_WINDOW", self.cancel)
         self.after(150, self._grab)
+
+    # -- sizing -------------------------------------------------------- #
+    def _content_height(self) -> int:
+        """Height the body's contents want, measured rather than assumed."""
+        total = 0
+        for child in self.body.winfo_children():
+            pady = child.grid_info().get("pady", 0)
+            pad = sum(pady) if isinstance(pady, (tuple, list)) else int(pady or 0) * 2
+            total += child.winfo_reqheight() + pad
+        return total
+
+    def _content_width(self) -> int:
+        """Width the widest child wants, plus the scrollbar and the window padding.
+
+        A scrollable body does not pass its contents' width up the way a plain
+        frame does, so asking the window for its requested width would under-size
+        it and clip the entries.
+        """
+        widest = max((child.winfo_reqwidth() for child in self.body.winfo_children()), default=0)
+        return widest + 74      # 2 x 14 outer padding, the scrollbar and its margin
+
+    def fit_to_screen(self) -> None:
+        """Size to the content, but never past the screen, and centre on the parent."""
+        self.update_idletasks()
+        scaling = window_scaling(self)
+        screen_h, screen_w = self.winfo_screenheight(), self.winfo_screenwidth()
+        chrome = self.status.winfo_reqheight() + self.buttons.winfo_reqheight() + 56
+        # The screen clamp is applied last, so a minimum can never push a dialog off it.
+        want_w = max(self.MIN_WIDTH, self.winfo_reqwidth(), self._content_width())
+        want_h = max(self.MIN_HEIGHT, self._content_height() + chrome)
+        width = min(want_w, int(screen_w * self.MAX_WIDTH_FRACTION))
+        height = min(want_h, int(screen_h * self.MAX_HEIGHT_FRACTION))
+        master = self.master
+        try:
+            x = master.winfo_rootx() + max(0, (master.winfo_width() - width) // 2)
+            y = master.winfo_rooty() + max(0, (master.winfo_height() - height) // 3)
+        except Exception:                      # no usable parent geometry yet
+            x, y = (screen_w - width) // 2, (screen_h - height) // 3
+        x = max(0, min(x, screen_w - width))   # never off the edge of the screen
+        y = max(0, min(y, screen_h - height))
+        # Sizes go back in unscaled units; x and y are passed through as pixels.
+        self.geometry(f"{round(width / scaling)}x{round(height / scaling)}+{x}+{y}")
+        self.minsize(round(min(self.MIN_WIDTH, width) / scaling),
+                     round(min(self.MIN_HEIGHT, height) / scaling))
 
     def _grab(self) -> None:
         try:
@@ -109,13 +205,12 @@ class _Dialog(ctk.CTkToplevel):
         return widget
 
     def finish_layout(self, primary: str, on_primary: Callable[[], None]) -> None:
-        self.status.pack(fill="x", padx=20)
-        self.buttons.pack(fill="x", padx=20, pady=(8, 16))
         ctk.CTkButton(self.buttons, text="Cancel", width=100, fg_color="transparent", border_width=1,
                       command=self.cancel).pack(side="right", padx=(8, 0))
         self.primary = ctk.CTkButton(self.buttons, text=primary, width=140, command=on_primary)
         self.primary.pack(side="right")
         self.bind("<Return>", lambda _e: on_primary())
+        self.fit_to_screen()
 
     def busy(self, message: str) -> None:
         self.primary.configure(state="disabled")
