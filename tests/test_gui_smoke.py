@@ -10,6 +10,7 @@ something. Building the real window and calling those methods catches it.
 from __future__ import annotations
 
 import json
+import tkinter
 from pathlib import Path
 
 import pytest
@@ -58,8 +59,10 @@ def app(tmp_path_factory):
 
     try:
         window = ResearchAssistantApp(config, store=FakeStore())
-    except Exception as exc:  # pragma: no cover - no display available
-        pytest.skip(f"Tk window could not be created: {exc}")
+    except tkinter.TclError as exc:  # pragma: no cover - genuinely no display
+        pytest.skip(f"no display: {exc}")
+    # Anything else is a real bug: skipping on it once hid a NameError in the
+    # preview pane behind thirteen green "skipped" lines.
     window.update()
     yield window
     window.destroy()

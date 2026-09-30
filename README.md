@@ -188,6 +188,29 @@ list for all your papers**, shared with everyone you work with.
   - every change appears as a small commit in that repository's history;
   - the default branch must accept direct pushes.
 
+## Language (English / German)
+
+The **Language** menu switches the interface between English and Deutsch. The choice is saved and takes
+effect when the app restarts; it offers to restart for you.
+
+**Only the interface changes.** Your papers are always written in English:
+
+- the folder structure, `main.tex`, the section files and every README the app creates,
+- figure and table code, captions and the `Caption to be written.` placeholder,
+- the instructions sent to Claude - which is what keeps its writing English,
+- commit messages, which reach Overleaf's history,
+- the saved reports in `reports/`, the shared `todo.md`, and the agent's step-by-step log.
+
+This is enforced, not just intended. `tests/test_i18n.py` fails if a module that writes into a paper so
+much as imports the translator, and it scaffolds a paper with the interface in German and compares it byte
+for byte with the English one.
+
+**Adding or fixing a translation:** the English text is the key. Edit `core/lang/de_menu.py` (buttons and
+menus), `de_forms.py` (forms and dialogs) or `de_status.py` (messages). Anything without a German entry
+falls back to English rather than breaking, and `test_every_translated_string_has_german` lists what is
+missing. Text that is also an identifier - the task names, the middle switch, the to-do filters - goes
+through `i18n.Choices`, which shows the translation but hands the English value back to the code.
+
 ## Sign-in (once, inside the app)
 
 On first launch the app asks for your credentials. They are stored in **Windows Credential Manager** (Keychain on macOS) and reused until you sign out or a service rejects them. If a key or token stops working, the app asks you to sign in again.
@@ -400,6 +423,8 @@ core/
   results_workflow.py   → Results Figures & Tables: pick a table, validate the plan, insert the float
   references.py         → identifier resolution, de-duplication, BibTeX, \bibliography wiring
   registry.py           → workflow tab order
+  i18n.py               → t(): the interface language; never imported by anything that writes a paper
+  lang/de_*.py          → the German catalogue (menus, forms, status messages)
   todos.py              → shared todo.md: format, operations, replay-on-conflict syncing
   global_todos.py       → the shared list's own repository, and moving old per-paper lists into it
   project_layout.py     → folder structure of a new local paper + starter files

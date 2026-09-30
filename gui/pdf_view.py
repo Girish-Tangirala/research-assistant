@@ -17,6 +17,7 @@ from typing import Any
 import customtkinter as ctk
 
 from core.preview import PDFIUM_LOCK
+from core.i18n import t
 
 PAGE_GAP = 14
 MARGIN = 12
@@ -237,12 +238,12 @@ class PdfViewer(ctk.CTkFrame):
             x = max(MARGIN, (max(width, content_width) - int(w * self.scale)) // 2)
             pw, ph = int(w * self.scale), int(h * self.scale)
             self.canvas.create_rectangle(x, y, x + pw, y + ph, fill="white", outline="", tags=(f"slot{index}",))
-            self.canvas.create_text(x + pw // 2, y + ph // 2, text=f"Page {index + 1}", fill="#999",
+            self.canvas.create_text(x + pw // 2, y + ph // 2, text=t("Page {number}", number=index + 1), fill="#999",
                                     tags=(f"label{index}",))
             if index in self.highlight:
                 self.canvas.create_rectangle(x - 4, y - 4, x + pw + 4, y + ph + 4, outline=HIGHLIGHT, width=3,
                                              tags=("hl",))
-                self.canvas.create_text(x + 6, y + 6, text="● changed", anchor="nw", fill=HIGHLIGHT,
+                self.canvas.create_text(x + 6, y + 6, text=t("● changed"), anchor="nw", fill=HIGHLIGHT,
                                         font=("Segoe UI", 10, "bold"), tags=("hl",))
             y += ph + PAGE_GAP
         self.canvas.configure(scrollregion=(0, 0, max(width, content_width), y + MARGIN))

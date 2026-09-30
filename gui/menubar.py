@@ -10,6 +10,7 @@ import tkinter as tk
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from core.i18n import LANGUAGES, t
 
 HELP_LINKS = (
     ("Overleaf Git integration guide", "https://docs.overleaf.com/integrations-and-add-ons/"
@@ -54,6 +55,7 @@ class MenuActions:
     todo_repo: Callable[[], None] | None = None
     migrate_todos: Callable[[], None] | None = None
     toggle_fullscreen: Callable[[], None] | None = None
+    language_changed: Callable[[str], None] | None = None
 
 
 class AppMenuBar:
@@ -61,31 +63,31 @@ class AppMenuBar:
 
     def __init__(self, root: tk.Misc, actions: MenuActions, options: list[tuple[str, tk.BooleanVar]],
                  appearance: tk.StringVar, preview_visible: tk.BooleanVar,
-                 fullscreen: tk.BooleanVar | None = None) -> None:
+                 fullscreen: tk.BooleanVar | None = None, language: tk.StringVar | None = None) -> None:
         self.actions = actions
         self.bar = tk.Menu(root, tearoff=False)
 
         file_menu = tk.Menu(self.bar, tearoff=False)
-        file_menu.add_command(label="Add paper…", command=actions.add_paper, accelerator="Ctrl+N")
-        file_menu.add_command(label="Edit paper…", command=actions.edit_paper)
-        file_menu.add_command(label="Remove paper…", command=actions.remove_paper)
+        file_menu.add_command(label=t("Add paper…"), command=actions.add_paper, accelerator="Ctrl+N")
+        file_menu.add_command(label=t("Edit paper…"), command=actions.edit_paper)
+        file_menu.add_command(label=t("Remove paper…"), command=actions.remove_paper)
         file_menu.add_separator()
-        file_menu.add_command(label="Refresh paper", command=actions.sync_paper, accelerator="F5")
-        file_menu.add_command(label="Sync with Overleaf…", command=actions.publish_paper,
+        file_menu.add_command(label=t("Refresh paper"), command=actions.sync_paper, accelerator="F5")
+        file_menu.add_command(label=t("Sync with Overleaf…"), command=actions.publish_paper,
                               accelerator="Ctrl+Shift+S")
-        file_menu.add_command(label="Back up data to OneDrive…", command=actions.backup_data)
+        file_menu.add_command(label=t("Back up data to OneDrive…"), command=actions.backup_data)
         file_menu.add_separator()
-        file_menu.add_command(label="Organise paper into folders…", command=actions.organise_paper)
+        file_menu.add_command(label=t("Organise paper into folders…"), command=actions.organise_paper)
         file_menu.add_separator()
-        file_menu.add_command(label="Open paper folder", command=actions.open_folder)
-        file_menu.add_command(label="Open reports folder", command=actions.open_reports)
-        file_menu.add_command(label="Open log file", command=actions.open_log)
+        file_menu.add_command(label=t("Open paper folder"), command=actions.open_folder)
+        file_menu.add_command(label=t("Open reports folder"), command=actions.open_reports)
+        file_menu.add_command(label=t("Open log file"), command=actions.open_log)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=actions.exit_app)
-        self.bar.add_cascade(label="File", menu=file_menu, underline=0)
+        file_menu.add_command(label=t("Exit"), command=actions.exit_app)
+        self.bar.add_cascade(label=t("File"), menu=file_menu, underline=0)
 
         self.accounts_menu = tk.Menu(self.bar, tearoff=False, postcommand=self._rebuild_accounts)
-        self.bar.add_cascade(label="Accounts", menu=self.accounts_menu, underline=0)
+        self.bar.add_cascade(label=t("Accounts"), menu=self.accounts_menu, underline=0)
         self._rebuild_accounts()
 
         options_menu = tk.Menu(self.bar, tearoff=False)
@@ -93,42 +95,51 @@ class AppMenuBar:
             options_menu.add_checkbutton(label=label, variable=var, command=actions.options_changed)
         if actions.todo_repo is not None:
             options_menu.add_separator()
-            options_menu.add_command(label="Shared to-do list\u2026", command=actions.todo_repo)
+            options_menu.add_command(label=t("Shared to-do list\u2026"), command=actions.todo_repo)
         if actions.migrate_todos is not None:
-            options_menu.add_command(label="Move paper to-do lists into the shared list\u2026",
+            options_menu.add_command(label=t("Move paper to-do lists into the shared list\u2026"),
                                      command=actions.migrate_todos)
-        self.bar.add_cascade(label="Options", menu=options_menu, underline=0)
+        self.bar.add_cascade(label=t("Options"), menu=options_menu, underline=0)
 
         view_menu = tk.Menu(self.bar, tearoff=False)
         if fullscreen is not None and actions.toggle_fullscreen is not None:
             # Discoverable way back: fullscreen hides the title bar, so there is no close button.
-            view_menu.add_checkbutton(label="Full screen", variable=fullscreen,
+            view_menu.add_checkbutton(label=t("Full screen"), variable=fullscreen,
                                       command=actions.toggle_fullscreen, accelerator="F11")
-        view_menu.add_checkbutton(label="Show PDF preview", variable=preview_visible,
+        view_menu.add_checkbutton(label=t("Show PDF preview"), variable=preview_visible,
                                   command=actions.toggle_preview, accelerator="Ctrl+P")
-        view_menu.add_command(label="Recompile PDF", command=actions.recompile, accelerator="F6")
+        view_menu.add_command(label=t("Recompile PDF"), command=actions.recompile, accelerator="F6")
         view_menu.add_separator()
         appearance_menu = tk.Menu(view_menu, tearoff=False)
         for mode in ("Dark", "Light", "System"):
-            appearance_menu.add_radiobutton(label=mode, value=mode, variable=appearance,
+            # The label is translated; the value stays English, as it is saved and given to CustomTkinter.
+            appearance_menu.add_radiobutton(label=t(mode), value=mode, variable=appearance,
                                             command=lambda m=mode: actions.appearance_changed(m))
-        view_menu.add_cascade(label="Appearance", menu=appearance_menu)
-        self.bar.add_cascade(label="View", menu=view_menu, underline=0)
+        view_menu.add_cascade(label=t("Appearance"), menu=appearance_menu)
+        self.bar.add_cascade(label=t("View"), menu=view_menu, underline=0)
+
+        if language is not None and actions.language_changed is not None:
+            language_menu = tk.Menu(self.bar, tearoff=False)
+            for code, name in LANGUAGES.items():
+                # The names stay in their own language - "Deutsch" is not translated.
+                language_menu.add_radiobutton(label=name, value=code, variable=language,
+                                              command=lambda c=code: actions.language_changed(c))
+            self.bar.add_cascade(label=t("Language"), menu=language_menu, underline=0)
 
         help_menu = tk.Menu(self.bar, tearoff=False)
         if actions.user_guide:
-            help_menu.add_command(label="User guide", command=actions.user_guide)
+            help_menu.add_command(label=t("User guide"), command=actions.user_guide)
         if actions.check_updates:
-            help_menu.add_command(label="Check for updates…", command=actions.check_updates)
+            help_menu.add_command(label=t("Check for updates…"), command=actions.check_updates)
         if actions.setup_tools:
-            help_menu.add_command(label="Install Git / MiKTeX…", command=actions.setup_tools)
+            help_menu.add_command(label=t("Install Git / MiKTeX…"), command=actions.setup_tools)
         if actions.user_guide or actions.setup_tools or actions.check_updates:
             help_menu.add_separator()
         for label, url in HELP_LINKS:
             help_menu.add_command(label=label, command=lambda u=url: webbrowser.open(u))
         help_menu.add_separator()
-        help_menu.add_command(label="About", command=actions.about)
-        self.bar.add_cascade(label="Help", menu=help_menu, underline=0)
+        help_menu.add_command(label=t("About"), command=actions.about)
+        self.bar.add_cascade(label=t("Help"), menu=help_menu, underline=0)
 
         root.configure(menu=self.bar)
         root.bind_all("<Control-n>", lambda _e: actions.add_paper())

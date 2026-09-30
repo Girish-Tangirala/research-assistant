@@ -35,7 +35,7 @@ The Research Assistant is a desktop app for writing LaTeX papers that live on Ov
    - Skipped it? **Help → Install Git / MiKTeX…** opens the window again.
 5. Tip: right-click the `.exe` → *Show more options* → **Send to → Desktop (create shortcut)**.
 
-**Updates arrive by themselves.** When a new version has been published, the app shows *Update available* at start, with what's new. Click **Update now**: it downloads the new version, checks it, closes, replaces itself and starts again in a few seconds. **Later** skips it until the next start, and **Help → Check for updates…** checks at any time. Your papers, settings and sign-ins are kept, because they are stored elsewhere (see section 12). Updating needs the app folder to be somewhere you can write to, such as Documents (not *Program Files*).
+**Updates arrive by themselves.** When a new version has been published, the app shows *Update available* at start, with what's new. Click **Update now**: it downloads the new version, checks it, closes, replaces itself and starts again in a few seconds. **Later** skips it until the next start, and **Help → Check for updates…** checks at any time. Your papers, settings and sign-ins are kept, because they are stored elsewhere (see section 13). Updating needs the app folder to be somewhere you can write to, such as Documents (not *Program Files*).
 
 ## 3. Signing in (once)
 
@@ -164,7 +164,16 @@ Before version 1.3.0 each paper had its own to-do list. Choose **Options ▸ Mov
 shared list…** once: it copies those tasks over with their assignee, due date and state, and then removes
 `todo.md` from each paper. Press **Sync** on each paper afterwards so it disappears from Overleaf too.
 
-## 9. Sending your work to Overleaf: Sync
+## 9. Language: English or Deutsch
+
+The **Language** menu at the top switches the app between English and Deutsch. The app asks whether to
+restart, because the labels are set when the window opens.
+
+Only the buttons and messages change language. **Your paper is always written in English** - the folder
+structure, the LaTeX, the captions and everything the assistant writes for you. That is deliberate: you
+publish in English, and a German word must never slip into a manuscript.
+
+## 10. Sending your work to Overleaf: Sync
 
 Press **⇄ Sync with Overleaf** (left panel). The app:
 
@@ -176,7 +185,7 @@ The left panel shows how many changes are waiting. **⟳ Refresh** only fetches 
 
 If you and a co-author changed the **same lines**, nothing is sent and the app tells you. Sort it out in Overleaf, then Sync again.
 
-## 10. Backing up your data to OneDrive
+## 11. Backing up your data to OneDrive
 
 Your `data\` and `supplementary\` folders never go to Overleaf, so they are the only things with no second
 copy. Press **☁ Back up data** (left panel) to copy them into OneDrive.
@@ -219,7 +228,7 @@ uploading, so its icons are what confirm it:
 | Green tick or white cloud | uploaded and safe |
 | Red cross | OneDrive has a problem — open it and read the message |
 
-## 11. LaTeX errors
+## 12. LaTeX errors
 
 Like Overleaf, the app keeps building the PDF when LaTeX can recover from an error. In that case:
 
@@ -230,7 +239,7 @@ Only a serious error (for example a missing file) stops the PDF. The label turns
 
 When the AI changes your paper, it is only rolled back if it **adds a new** error. Errors that were already there don't block it.
 
-## 12. Where your files are
+## 13. Where your files are
 
 Everything is in the folder **`C:\Users\<you>\.research_agent`**:
 
@@ -248,7 +257,7 @@ Your Claude key and Overleaf token are in **Windows Credential Manager** (Contro
 
 **What is sent where:** for AI tasks, the text the task needs (for example one section) goes to Anthropic's Claude API. Editing, the PDF and the history stay on your computer; Sync talks only to Overleaf, and Back up data only copies into your own OneDrive folder.
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 | Problem | What to do |
 |---|---|

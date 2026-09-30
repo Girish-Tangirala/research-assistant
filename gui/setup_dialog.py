@@ -21,6 +21,7 @@ from core.dependencies import (
     missing_tools,
 )
 from gui.dialogs import MUTED, OK, _Dialog
+from core.i18n import t
 
 WARN = "#e3b341"
 LABELS = {"git": "Git (history of your papers, talking to Overleaf)",
@@ -48,13 +49,14 @@ class SetupDialog(_Dialog):
         self.missing = missing
         self.rows: dict[str, ctk.CTkLabel] = {}
         for tool in ("git", "miktex"):
-            state = "needed" if tool in missing else "already installed ✓"
-            self.rows[tool] = self.label(f"• {LABELS[tool]}: {state}", color=None if tool in missing else OK)
+            state = t("needed") if tool in missing else t("already installed ✓")
+            self.rows[tool] = self.label(t("• {tool}: {state}", tool=t(LABELS[tool]), state=state),
+                                         color=None if tool in missing else OK)
         self.bar = ctk.CTkProgressBar(self.body, width=460)
         self.bar.set(0)
         self.bar.grid(row=self._row, column=0, sticky="ew", pady=(6, 4))
         self._row += 1
-        self.label("You can also do it later: Help ▸ Install Git / MiKTeX…", color=MUTED)
+        self.label(t("You can also do it later: Help ▸ Install Git / MiKTeX…"), color=MUTED)
         self.finish_layout("Install now", self.start)
         self._cancel_requested = False
         self._running = False
@@ -67,7 +69,7 @@ class SetupDialog(_Dialog):
         if self._running:
             return
         self._running = True
-        self.busy("Starting…")
+        self.busy(t("Starting…"))
         threading.Thread(target=self._work, daemon=True, name="setup").start()
         self.after(150, self._poll)
 
@@ -76,7 +78,7 @@ class SetupDialog(_Dialog):
         for tool in self.missing:
             find, install = STEPS[tool]
             try:
-                self._messages[tool] = ("finding the current version…", None)
+                self._messages[tool] = (t("finding the current version…"), None)
                 installer = find()
                 self._messages[tool] = (f"downloading {installer.file_name}…", None)
                 path = download(installer, download_folder(), progress=self._on_progress,
@@ -84,9 +86,9 @@ class SetupDialog(_Dialog):
                 self._messages[tool] = ("installing (a window of the installer may appear)…", None)
                 self._progress = (0, 0)
                 install(path)
-                self._messages[tool] = ("installed ✓", OK)
+                self._messages[tool] = (t("installed ✓"), OK)
             except (DependencyError, OSError, subprocess.SubprocessError) as exc:
-                errors.append(f"{tool}: {exc}")
+                errors.append(t("{tool}: {problem}", tool=tool, problem=exc))
                 self._messages[tool] = (f"not installed - {exc}", WARN)
             if self._cancel_requested:
                 break
@@ -98,7 +100,8 @@ class SetupDialog(_Dialog):
     def _poll(self) -> None:
         default = ctk.ThemeManager.theme["CTkLabel"]["text_color"]
         for tool, (text, color) in list(self._messages.items()):
-            self.rows[tool].configure(text=f"• {LABELS[tool]}: {text}", text_color=color or default)
+            self.rows[tool].configure(text=t("• {tool}: {state}", tool=t(LABELS[tool]), state=text),
+                                      text_color=color or default)
         done, total = self._progress
         if total:
             self.bar.configure(mode="determinate")
@@ -115,8 +118,8 @@ class SetupDialog(_Dialog):
         if ok:
             self.missing = []
             self.bind("<Return>", lambda _e: self._restart())
-            self.status.configure(text="Done. Restart the Research Assistant to use them.", text_color=OK)
-            self.primary.configure(text="Restart now", state="normal", command=self._restart)
+            self.status.configure(text=t("Done. Restart the Research Assistant to use them."), text_color=OK)
+            self.primary.configure(text=t("Restart now"), state="normal", command=self._restart)
         else:
             still = missing_tools()
             self.fail("Not everything could be installed:\n" + "\n".join(errors) if errors else "Cancelled.")
@@ -137,7 +140,7 @@ class SetupDialog(_Dialog):
     def cancel(self) -> None:
         if self._running:
             self._cancel_requested = True  # stops a download; a running installer finishes first
-            self.status.configure(text="Stopping after the current step…", text_color=MUTED)
+            self.status.configure(text=t("Stopping after the current step…"), text_color=MUTED)
             return
         self.close(False)
 

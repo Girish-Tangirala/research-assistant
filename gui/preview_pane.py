@@ -24,6 +24,7 @@ from core.latex_parser import find_main_tex
 from core.preview import KIND_APPROVED, KIND_CURRENT, KIND_PROPOSED, PreviewBuilder, PreviewResult, source_signature
 from gui.dialogs import _Dialog
 from gui.panels import open_path
+from core.i18n import Choices, t
 
 MUTED = "#8b949e"
 BADGES = {
@@ -43,6 +44,11 @@ CLICK_HINTS = {
 }
 
 
+def click_choices() -> Choices:
+    """The three click modes, shown translated but compared as English."""
+    return Choices(list(CLICK_MODES))
+
+
 class PreviewPane(ctk.CTkFrame):
     """PDF preview with status, navigation and compile errors."""
 
@@ -56,8 +62,8 @@ class PreviewPane(ctk.CTkFrame):
         self.result: PreviewResult | None = None
         head = ctk.CTkFrame(self, fg_color="transparent")
         head.pack(fill="x", padx=10, pady=(10, 0))
-        ctk.CTkLabel(head, text="PDF preview", font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
-        ctk.CTkButton(head, text="Open PDF", width=90, fg_color="transparent", border_width=1,
+        ctk.CTkLabel(head, text=t("PDF preview"), font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
+        ctk.CTkButton(head, text=t("Open PDF"), width=90, fg_color="transparent", border_width=1,
                       command=self._open_external).pack(side="right")
         self.badge = ctk.CTkLabel(self, text="", text_color=MUTED, anchor="w", justify="left", wraplength=560)
         self.badge.pack(fill="x", padx=10, pady=(2, 0))
@@ -65,11 +71,11 @@ class PreviewPane(ctk.CTkFrame):
 
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(fill="x", padx=10, pady=4)
-        self.recompile_button = ctk.CTkButton(bar, text="⟳ Recompile", width=100, command=recompile)
+        self.recompile_button = ctk.CTkButton(bar, text=t("⟳ Recompile"), width=100, command=recompile)
         self.recompile_button.pack(side="left")
-        self.auto = ctk.CTkCheckBox(bar, text="Auto-recompile", width=60)
+        self.auto = ctk.CTkCheckBox(bar, text=t("Auto-recompile"), width=60)
         self.auto.pack(side="left", padx=(8, 0))
-        self.next_change = ctk.CTkButton(bar, text="Next change ▸", width=110, state="disabled",
+        self.next_change = ctk.CTkButton(bar, text=t("Next change ▸"), width=110, state="disabled",
                                          fg_color="#9e5a1c", hover_color="#b86a23", command=self._goto_next_change)
         self.next_change.pack(side="left", padx=8)
         ctk.CTkButton(bar, text="⤢", width=30, command=lambda: self.viewer.set_zoom(None)).pack(side="right")
@@ -80,8 +86,11 @@ class PreviewPane(ctk.CTkFrame):
 
         links = ctk.CTkFrame(self, fg_color="transparent")
         links.pack(fill="x", padx=10)
-        ctk.CTkLabel(links, text="Click in PDF:").pack(side="left")
-        self.click_mode = ctk.CTkSegmentedButton(links, values=list(CLICK_MODES), command=self._mode_clicked)
+        ctk.CTkLabel(links, text=t("Click in PDF:")).pack(side="left")
+        self.click_choices = click_choices()
+        self.click_mode = ctk.CTkSegmentedButton(
+            links, values=self.click_choices.labels,
+            command=lambda label: self._mode_clicked(self.click_choices.value(label)))
         self.click_mode.pack(side="left", padx=(6, 0))
         self._on_mode = on_mode
         self.source_label = ctk.CTkLabel(links, text="", text_color=MUTED, anchor="w")
@@ -99,18 +108,19 @@ class PreviewPane(ctk.CTkFrame):
     @property
     def mode(self) -> str:
         """``agent`` (fill a task form), ``source`` (open the .tex line) or ``off``."""
-        return CLICK_MODES.get(self.click_mode.get(), "agent")
+        return CLICK_MODES.get(self.click_choices.value(self.click_mode.get()), "agent")
 
     def set_click_mode(self, mode: str) -> None:
-        label = next((k for k, v in CLICK_MODES.items() if v == mode), "Agent task")
-        self.click_mode.set(label)
+        name = next((k for k, v in CLICK_MODES.items() if v == mode), "Agent task")
+        self.click_mode.set(self.click_choices.label(name))
         self.viewer.clickable = mode != "off"
-        self.set_source_status(CLICK_HINTS[CLICK_MODES[label]])
+        self.set_source_status(t(CLICK_HINTS[mode]))
 
-    def _mode_clicked(self, label: str) -> None:
-        self.set_click_mode(CLICK_MODES[label])
+    def _mode_clicked(self, name: str) -> None:
+        """``name`` is the English mode name the segmented button stands for."""
+        self.set_click_mode(CLICK_MODES[name])
         if self._on_mode:
-            self._on_mode(CLICK_MODES[label])
+            self._on_mode(CLICK_MODES[name])
 
     def _error_clicked(self, event: Any) -> None:
         """Open the ``file:line:`` of the clicked error in the editor."""
@@ -164,7 +174,7 @@ class PreviewPane(ctk.CTkFrame):
 
     def show_cached(self, pdf: Path) -> None:
         self.result = PreviewResult(KIND_CURRENT, "Last compiled version", True, pdf)
-        self.badge.configure(text="Last compiled version - click Recompile to refresh", text_color=MUTED)
+        self.badge.configure(text=t("Last compiled version - click Recompile to refresh"), text_color=MUTED)
         self.viewer.load(pdf, keep_position=False)
 
     def clear(self, text: str) -> None:
@@ -280,13 +290,13 @@ class PreviewMixin:
         main = find_main_tex(root) if root and root.is_dir() else None
         self._last_signature = None
         if main is None:
-            self.preview.clear("Sync the paper, then click Recompile to see the PDF.")
+            self.preview.clear(t("Sync the paper, then click Recompile to see the PDF."))
             return
         cached = self._preview_builder().current_pdf(root, main.relative_to(root).as_posix())
         if cached.exists():
             self.preview.show_cached(cached)
         else:
-            self.preview.clear("Click Recompile to build the PDF of this paper.")
+            self.preview.clear(t("Click Recompile to build the PDF of this paper."))
 
     def recompile_preview(self, quiet: bool = False) -> None:
         """Compile the paper as it is on disk, in the background."""
@@ -296,19 +306,19 @@ class PreviewMixin:
             return
         if self._workflow_running():      # the to-do list is a different repository and never conflicts
             if not quiet:
-                self.panel.append(EventKind.WARNING, "The paper is busy - recompile when the current task is done.")
+                self.panel.append(EventKind.WARNING, t("The paper is busy - recompile when the current task is done."))
             return
         if not builder.available:
-            self.preview.clear("No LaTeX compiler found - install MiKTeX or TeX Live to see the PDF.")
+            self.preview.clear(t("No LaTeX compiler found - install MiKTeX or TeX Live to see the PDF."))
             return
         main = find_main_tex(root) if root and root.is_dir() else None
         if main is None:
             if not quiet:
-                self.panel.append(EventKind.WARNING, "The paper is not cloned yet - click 'Sync paper' first.")
+                self.panel.append(EventKind.WARNING, t("The paper is not cloned yet - click 'Sync paper' first."))
             return
         self._preview_busy = True
         self.preview.set_busy(True)
-        self.preview.set_compiling("Compiling current version…")
+        self.preview.set_compiling(t("Compiling current version…"))
         self._last_signature = source_signature(root)
         main_rel = main.relative_to(root).as_posix()
 

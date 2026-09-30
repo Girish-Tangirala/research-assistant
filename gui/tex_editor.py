@@ -24,6 +24,7 @@ from core.latex_parser import find_main_tex
 from core.paper import read_text, write_text_preserving_eol
 from gui.dialogs import run_in_background
 from gui.tex_highlight import CodeText
+from core.i18n import t
 
 EDITABLE_SUFFIXES = {".tex", ".bib", ".cls", ".sty", ".bst", ".bbx", ".cbx", ".md", ".txt"}
 NO_FILE = "— no file —"
@@ -72,19 +73,19 @@ class TexEditor(ctk.CTkFrame):
         self.file_menu.pack(side="left")
         ctk.CTkButton(bar, text="↻", width=30, fg_color="transparent", border_width=1,
                       command=self.refresh_files).pack(side="left", padx=(4, 0))
-        self.save_button = ctk.CTkButton(bar, text="💾 Save & Recompile", width=150, fg_color="#1f6f3a",
+        self.save_button = ctk.CTkButton(bar, text=t("💾 Save & Recompile"), width=150, fg_color="#1f6f3a",
                                          hover_color="#27894a", command=self.save)
         self.save_button.pack(side="right")
 
         find = ctk.CTkFrame(self, fg_color="transparent")
         find.pack(fill="x", pady=(0, 4))
-        self.find_entry = ctk.CTkEntry(find, placeholder_text="Find (Ctrl+F)", width=200)
+        self.find_entry = ctk.CTkEntry(find, placeholder_text=t("Find (Ctrl+F)"), width=200)
         self.find_entry.pack(side="left")
         self.find_entry.bind("<Return>", lambda _e: self._find())
         self.find_entry.bind("<Shift-Return>", lambda _e: self._find(backwards=True))
         ctk.CTkButton(find, text="▼", width=28, command=self._find).pack(side="left", padx=(4, 0))
         ctk.CTkButton(find, text="▲", width=28, command=lambda: self._find(True)).pack(side="left", padx=(2, 0))
-        self.reload_button = ctk.CTkButton(find, text="Reload from disk", width=120, fg_color="#9e5a1c",
+        self.reload_button = ctk.CTkButton(find, text=t("Reload from disk"), width=120, fg_color="#9e5a1c",
                                            hover_color="#b86a23", command=lambda: self._load(self.rel))
         self.status = ctk.CTkLabel(find, text="", text_color=MUTED, anchor="w")
         self.status.pack(side="left", fill="x", expand=True, padx=8)
@@ -140,7 +141,7 @@ class TexEditor(ctk.CTkFrame):
 
     def paper_changed(self) -> None:
         """Another paper was selected (or the folder appeared): offer to save, then open its main file."""
-        if self.dirty and messagebox.askyesno("Unsaved changes", f"Save your changes to {self.rel} first?",
+        if self.dirty and messagebox.askyesno(t("Unsaved changes"), t("Save your changes to {file} first?", file=self.rel),
                                               parent=self):
             self.save(recompile=False, blocking=True)  # commit before the paper (and its folder) changes
         self.rel, self._saved_text, self._mtime = None, "", None
@@ -224,9 +225,11 @@ class TexEditor(ctk.CTkFrame):
             return
         if path is not None and path.exists() and path.stat().st_mtime != self._mtime \
                 and read_text(path).replace("\r\n", "\n") != self._saved_text:
-            if not messagebox.askyesno("Changed on disk", f"{self.rel} was changed outside the editor (by a task "
-                                       "or a sync) after you opened it.\n\nOverwrite it with your version?",
-                                       parent=self):
+            if not messagebox.askyesno(
+                    t("Changed on disk"),
+                    t("{file} was changed outside the editor (by a task or a sync) after you opened it."
+                      "\n\nOverwrite it with your version?", file=self.rel),
+                    parent=self):
                 return
         content = self.code.text.get("1.0", "end-1c")
         write_text_preserving_eol(path, content)
@@ -245,7 +248,7 @@ class TexEditor(ctk.CTkFrame):
         def failed(exc: Exception) -> None:
             self._saving = False
             self._show_status(f"Saved {rel}, but not committed: {exc}", WARN)
-            self.ctx.notify(EventKind.WARNING, f"{rel} was saved but not committed: {exc}")
+            self.ctx.notify(EventKind.WARNING, t("{file} was saved but not committed: {problem}", file=rel, problem=exc))
             if recompile:
                 self.ctx.recompile()
 

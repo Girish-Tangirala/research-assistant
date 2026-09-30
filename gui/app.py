@@ -14,6 +14,7 @@ credential vault via :class:`core.credentials.CredentialStore`.
 from __future__ import annotations
 
 import logging
+import subprocess
 import sys
 import threading
 import traceback
@@ -51,11 +52,14 @@ from gui.preview_pane import PreviewMixin
 from gui.sharepoint import SharePointMixin
 from gui.todo_panel import TodoContext
 from gui.todo_setup import TodoSetupMixin
+from core.i18n import LANGUAGES, set_language, t
 
 logger = logging.getLogger("research_agent")
 MUTED = "#8b949e"
-SIDEBAR_WIDTH = 172   # narrow, so the PDF gets the room
-WRAP = SIDEBAR_WIDTH - 34   # labels sit inside a padded frame
+# Narrow, so the PDF gets the room - but German needs more: "Hinzufügen / Bearbeiten /
+# Entfernen" does not fit where "Add / Edit / Remove" does.
+SIDEBAR_WIDTHS = {"en": 172, "de": 252}
+WRAP_MARGIN = 34      # labels sit inside a padded frame
 
 
 class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMixin, PdfLinkMixin,
@@ -72,6 +76,8 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
             self.app_state.author_name = self.app_state.author_name or name
             self.app_state.author_email = self.app_state.author_email or email
         ctk.set_appearance_mode(self.app_state.appearance)
+        # Before any widget is built: every label is translated as it is created.
+        set_language(self.app_state.language)
         self.bus = EventBus()
         self.cancel_token: CancelToken | None = None
         self.gate: ApprovalGate | None = None
@@ -105,7 +111,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         self._refresh_papers()
         for problem in config.validate():
             self.panel.append(EventKind.WARNING, problem)
-        self.panel.append(EventKind.INFO, f"Workspace: {config.workspace}")
+        self.panel.append(EventKind.INFO, t("Workspace: {path}", path=config.workspace))
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(50, self._poll_events)
         self.after(400, self._startup)
@@ -145,9 +151,11 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
 
     def _build_sidebar(self) -> None:
         small = ctk.CTkFont(size=12)
-        side = ctk.CTkScrollableFrame(self, width=SIDEBAR_WIDTH, corner_radius=0)
+        width = SIDEBAR_WIDTHS.get(self.app_state.language, SIDEBAR_WIDTHS["en"])
+        wrap = width - WRAP_MARGIN
+        side = ctk.CTkScrollableFrame(self, width=width, corner_radius=0)
         side.grid(row=0, column=0, sticky="nsew")
-        ctk.CTkLabel(side, text="Research Assistant", font=ctk.CTkFont(size=15, weight="bold")).pack(
+        ctk.CTkLabel(side, text=t("Research Assistant"), font=ctk.CTkFont(size=15, weight="bold")).pack(
             anchor="w", padx=10, pady=(12, 0))
         ctk.CTkLabel(side, text=f"{self.config_.llm.model} · effort {self.config_.llm.effort}",
                      text_color=MUTED, font=ctk.CTkFont(size=11)).pack(anchor="w", padx=10, pady=(0, 4))
@@ -155,29 +163,29 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         paper = self._section(side, "Paper")
         self.paper_menu = ctk.CTkOptionMenu(paper, values=[NO_PAPER], command=self._select_paper)
         self.paper_menu.pack(fill="x", padx=10, pady=4)
-        self.paper_info = ctk.CTkLabel(paper, text="", text_color=MUTED, wraplength=WRAP, justify="left", anchor="w",
+        self.paper_info = ctk.CTkLabel(paper, text="", text_color=MUTED, wraplength=wrap, justify="left", anchor="w",
                                        font=ctk.CTkFont(size=11))
         self.paper_info.pack(fill="x", padx=10, pady=(0, 4))
         row = ctk.CTkFrame(paper, fg_color="transparent")
         row.pack(fill="x", padx=10, pady=(2, 10))
         for text, command in (("Add", self._add_paper), ("Edit", self._edit_paper), ("Remove", self._remove_paper)):
-            ctk.CTkButton(row, text=text, width=10, font=small, command=command).pack(
+            ctk.CTkButton(row, text=t(text), width=10, font=small, command=command).pack(
                 side="left", padx=(0, 4), expand=True, fill="x")
-        self.sync_status = ctk.CTkLabel(paper, text="", text_color=MUTED, wraplength=WRAP, justify="left",
+        self.sync_status = ctk.CTkLabel(paper, text="", text_color=MUTED, wraplength=wrap, justify="left",
                                         anchor="w", font=ctk.CTkFont(size=11))
         self.sync_status.pack(fill="x", padx=10, pady=(0, 2))
-        self.publish_button = ctk.CTkButton(paper, text="⇄  Sync with Overleaf", font=small,
+        self.publish_button = ctk.CTkButton(paper, text=t("⇄  Sync with Overleaf"), font=small,
                                             command=self._sync_with_overleaf)
         self.publish_button.pack(fill="x", padx=10, pady=(2, 4))
-        self.backup_button = ctk.CTkButton(paper, text="☁  Back up data", font=small, fg_color="transparent",
+        self.backup_button = ctk.CTkButton(paper, text=t("☁  Back up data"), font=small, fg_color="transparent",
                                            border_width=1, command=self._backup_to_sharepoint)
         self.backup_button.pack(fill="x", padx=10, pady=(0, 4))
         bottom = ctk.CTkFrame(paper, fg_color="transparent")
         bottom.pack(fill="x", padx=10, pady=(0, 10))
-        self.sync_button = ctk.CTkButton(bottom, text="⟳ Refresh", width=10, font=small, fg_color="transparent",
+        self.sync_button = ctk.CTkButton(bottom, text=t("⟳ Refresh"), width=10, font=small, fg_color="transparent",
                                          border_width=1, command=lambda: self._start(SyncWorkflow, {}))
         self.sync_button.pack(side="left", expand=True, fill="x", padx=(0, 4))
-        ctk.CTkButton(bottom, text="Folder", width=10, font=small, fg_color="transparent", border_width=1,
+        ctk.CTkButton(bottom, text=t("Folder"), width=10, font=small, fg_color="transparent", border_width=1,
                       command=self._open_paper_folder).pack(side="left", expand=True, fill="x")
 
     def _build_menubar(self) -> None:
@@ -189,6 +197,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         self.confirm_var = ctk.BooleanVar(value=self.app_state.confirm_push)
         self.preview_visible_var = ctk.BooleanVar(value=self.app_state.show_preview)
         self.fullscreen_var = ctk.BooleanVar(value=False)
+        self.language_var = ctk.StringVar(value=self.app_state.language)
         self.menubar = AppMenuBar(
             self,
             MenuActions(
@@ -207,6 +216,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
                 todo_repo=self._edit_todo_repo,
                 migrate_todos=self._migrate_todo_lists,
                 toggle_fullscreen=lambda: self.set_fullscreen(self.fullscreen_var.get()),
+                language_changed=self._change_language,
                 check_updates=lambda: self.check_for_updates(verbose=True),
             ),
             options=[("Send to Overleaf right after each approval (off: use the Sync button)", self.push_var),
@@ -215,8 +225,31 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
                      ("Preview changes before approval", self.preview_var),
                      ("Use Claude web search", self.web_var)],
             appearance=self.appearance_var, preview_visible=self.preview_visible_var,
-            fullscreen=self.fullscreen_var,
+            fullscreen=self.fullscreen_var, language=self.language_var,
         )
+
+    def _change_language(self, code: str) -> None:
+        """Save the language and offer to restart - every label is built once, at start-up."""
+        if code == self.app_state.language:
+            return
+        self.app_state.language = code
+        self._save_state()
+        if messagebox.askyesno(t("Restart to change the language"),
+                               t("The language changes when the app restarts.\n\nRestart now?"),
+                               parent=self):
+            self._restart()
+        else:
+            self.panel.append(EventKind.INFO, t("The language will change the next time you start the app."))
+
+    def _restart(self) -> None:
+        """Close this window and start the app again (source or packaged)."""
+        command = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, *sys.argv]
+        try:
+            subprocess.Popen(command, cwd=str(Path(sys.argv[0]).resolve().parent), close_fds=True)
+        except OSError as exc:      # could not relaunch: say so rather than closing on a dead end
+            messagebox.showwarning(t("Restart to change the language"), str(exc), parent=self)
+            return
+        self._on_close()
 
     def _set_appearance(self, mode: str) -> None:
         ctk.set_appearance_mode(mode)
@@ -227,7 +260,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         if log.exists():
             open_path(log)
         else:
-            self.panel.append(EventKind.INFO, "No log file yet.")
+            self.panel.append(EventKind.INFO, t("No log file yet."))
 
     def _open_user_guide(self) -> None:
         # Next to the code when run from source; inside the bundle in the packaged app.
@@ -236,14 +269,17 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         if guide.exists():
             open_path(guide)
         else:
-            self.panel.append(EventKind.WARNING, f"The user guide was not found at {guide}.")
+            self.panel.append(EventKind.WARNING, t("The user guide was not found at {path}.", path=guide))
 
     def _about(self) -> None:
         compiler = self.config_.latex
         tex = compiler.compiler if (compiler.latexmk_path or compiler.pdflatex_path) else "not found"
         messagebox.showinfo(
-            "About", f"Scientific Research Assistant Agent {__version__}\n\nModel: {self.config_.llm.model} "
-            f"(effort {self.config_.llm.effort})\nLaTeX: {tex}\nWorkspace: {self.config_.workspace}",
+            t("About"),
+            t("Scientific Research Assistant Agent {version}\n\nModel: {model} (effort {effort})\n"
+              "LaTeX: {latex}\nWorkspace: {workspace}",
+              version=__version__, model=self.config_.llm.model, effort=self.config_.llm.effort,
+              latex=tex, workspace=self.config_.workspace),
             parent=self)
 
     # ------------------------------------------------------------------ #
@@ -266,7 +302,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
                 then()
             return
         if not missing:
-            messagebox.showinfo("Git and MiKTeX", "Git and MiKTeX are both installed.", parent=self)
+            messagebox.showinfo(t("Git and MiKTeX"), t("Git and MiKTeX are both installed."), parent=self)
             return
         SetupDialog(self, missing, on_done=lambda _ok: then() if then else None)
 
@@ -281,11 +317,11 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
 
     def _start(self, workflow_cls: type[BaseWorkflow], params: dict[str, Any]) -> None:
         if self._workflow_running():
-            self.panel.append(EventKind.WARNING, "A workflow is already running.")
+            self.panel.append(EventKind.WARNING, t("A workflow is already running."))
             return
         spec = self.app_state.current
         if spec is None:
-            self.panel.append(EventKind.WARNING, "Add a paper first.")
+            self.panel.append(EventKind.WARNING, t("Add a paper first."))
             self._open_paper_dialog(None)
             return
         def after_claude() -> None:
@@ -317,7 +353,8 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         self.sync_button.configure(state="disabled")
         self.publish_button.configure(state="disabled")
         self.backup_button.configure(state="disabled")
-        self.panel.append(EventKind.STATE, f"▶ {workflow_cls.name} - {spec.name}")
+        self.panel.append(EventKind.STATE, t("▶ {task} - {paper}",
+                                             task=t(workflow_cls.name), paper=spec.name))
         self.worker = threading.Thread(target=self._worker, args=(workflow_cls, params, engine),
                                        daemon=True, name="agent-worker")
         self.worker.start()
@@ -347,7 +384,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
     def _cancel(self) -> None:
         if self.cancel_token:
             self.cancel_token.cancel()
-            self.panel.append(EventKind.WARNING, "Cancellation requested - stopping after the current step…")
+            self.panel.append(EventKind.WARNING, t("Cancellation requested - stopping after the current step…"))
 
     # ------------------------------------------------------------------ #
     # Events
@@ -391,7 +428,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
             # A task that stopped must not look like "nothing happened": say so where it can't be missed.
             self.panel.append(kind, event.message)
             detail = event.message.split(": ", 1)[-1]
-            messagebox.showerror("The task did not finish", detail[:1500] + "\n\nAnything it had not finished was "
+            messagebox.showerror(t("The task did not finish"), detail[:1500] + "\n\nAnything it had not finished was "
                                  "undone. The full details are in the Live Log (Agent tasks).", parent=self)
         else:
             self.panel.append(kind, event.message)
@@ -426,7 +463,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         if isinstance(exc, GitAuthError):
             self.bus.emit(EventKind.AUTH_REQUIRED, str(exc), service="git", host=exc.host)
         else:
-            self.panel.append(EventKind.ERROR, f"To-do list: {exc}")
+            self.panel.append(EventKind.ERROR, t("To-do list: {problem}", problem=exc))
             logger.error("To-do operation failed: %s", exc)
 
     # ------------------------------------------------------------------ #
@@ -442,7 +479,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         try:
             self.app_state.save(self.config_.settings_file)
         except OSError as exc:
-            self.panel.append(EventKind.WARNING, f"Could not save settings: {exc}")
+            self.panel.append(EventKind.WARNING, t("Could not save settings: {problem}", problem=exc))
 
     def _on_close(self) -> None:
         if not self._editor_may_close():

@@ -18,6 +18,7 @@ import customtkinter as ctk
 from core.events import EventKind
 from core.todos import TodoDoc, TodoError, TodoItem, TodoStore, op_add, op_delete, op_update
 from gui.dialogs import _Dialog, run_in_background
+from core.i18n import t
 
 MUTED, OVERDUE, DONE = "#8b949e", "#f85149", "#3fb950"
 FILTERS = ("Open", "Mine", "Overdue", "Done", "All")
@@ -48,19 +49,19 @@ class TodoEditDialog(_Dialog):
                  papers: list[str], on_save: Callable[[dict[str, Any]], None]) -> None:
         super().__init__(master, "Edit task", "Edit task", f"Created by {item.by or 'unknown'} on {item.created}.")
         self.on_save = on_save
-        self.text = self.entry("Task", item.text)
-        self.label("Assigned to")
+        self.text = self.entry(t("Task"), item.text)
+        self.label(t("Assigned to"))
         self.assignee = ctk.CTkComboBox(self.body, values=[""] + people, width=460)
         self.assignee.set(item.assignee)
         self.assignee.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
-        self.due = self.entry("Due date (YYYY-MM-DD)", item.due, placeholder="optional")
-        self.label("Paper")
+        self.due = self.entry(t("Due date (YYYY-MM-DD)"), item.due, placeholder="optional")
+        self.label(t("Paper"))
         self.paper = ctk.CTkComboBox(self.body, values=[""] + papers, width=460)
         self.paper.set(item.paper)
         self.paper.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
-        self.label("Section")
+        self.label(t("Section"))
         self.section = ctk.CTkComboBox(self.body, values=[""] + sections, width=460)
         self.section.set(item.section)
         self.section.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
@@ -71,7 +72,7 @@ class TodoEditDialog(_Dialog):
         fields = {"text": self.text.get(), "assignee": self.assignee.get(), "due": self.due.get(),
                   "paper": self.paper.get(), "section": self.section.get()}
         if not fields["text"].strip():
-            self.fail("The task text cannot be empty.")
+            self.fail(t("The task text cannot be empty."))
             return
         super().close(True)
         self.on_save(fields)
@@ -92,7 +93,7 @@ class TodoPanel(ctk.CTkFrame):
 
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(fill="x", pady=(0, 6))
-        self.refresh_button = ctk.CTkButton(bar, text="⟳ Refresh", width=100, command=self.refresh)
+        self.refresh_button = ctk.CTkButton(bar, text=t("⟳ Refresh"), width=100, command=self.refresh)
         self.refresh_button.pack(side="left")
         self.filter = ctk.CTkSegmentedButton(bar, values=list(FILTERS), command=lambda _v: self.render())
         self.filter.set("Open")
@@ -107,21 +108,21 @@ class TodoPanel(ctk.CTkFrame):
 
         # Two rows on a grid: the middle column is narrow, and one row of six fixed-width
         # widgets ran off the edge, hiding Section and the Add button.
-        ctk.CTkLabel(self, text="New task", anchor="w", text_color=MUTED).pack(fill="x")
+        ctk.CTkLabel(self, text=t("New task"), anchor="w", text_color=MUTED).pack(fill="x")
         add = ctk.CTkFrame(self, fg_color="transparent")
         add.pack(fill="x")
         add.grid_columnconfigure(0, weight=1)
-        self.new_text = ctk.CTkEntry(add, placeholder_text="New task, e.g. 'Update Fig. 3 with the new results'")
+        self.new_text = ctk.CTkEntry(add, placeholder_text=t("New task, e.g. 'Update Fig. 3 with the new results'"))
         self.new_text.grid(row=0, column=0, sticky="ew")
         self.new_text.bind("<Return>", lambda _e: self.add())
-        self.add_button = ctk.CTkButton(add, text="Add", width=70, command=self.add)
+        self.add_button = ctk.CTkButton(add, text=t("Add"), width=70, command=self.add)
         self.add_button.grid(row=0, column=1, padx=(6, 0))
 
         fields = ctk.CTkFrame(self, fg_color="transparent")
         fields.pack(fill="x", pady=(4, 6))
         self.new_assignee = ctk.CTkComboBox(fields, values=[""])
         self.new_assignee.set("")
-        self.new_due = ctk.CTkEntry(fields, placeholder_text="YYYY-MM-DD")
+        self.new_due = ctk.CTkEntry(fields, placeholder_text=t("YYYY-MM-DD"))
         self.new_paper = ctk.CTkComboBox(fields, values=[NO_PAPER])
         self.new_paper.set(NO_PAPER)
         self.new_section = ctk.CTkComboBox(fields, values=[""])
@@ -132,8 +133,8 @@ class TodoPanel(ctk.CTkFrame):
             ctk.CTkLabel(fields, text=caption, anchor="w", text_color=MUTED).grid(
                 row=0, column=column, sticky="w", padx=(0 if column == 0 else 6, 0))
             widget.grid(row=1, column=column, sticky="ew", padx=(0 if column == 0 else 6, 0))
-        ctk.CTkLabel(self, text="One list for all your papers. Everything except the task text is optional; "
-                                "naming a paper is\njust a label, so tasks that belong to no paper are fine too.",
+        ctk.CTkLabel(self, text=t("One list for all your papers. Everything except the task text is optional; "
+                                "naming a paper is\njust a label, so tasks that belong to no paper are fine too."),
                      text_color=MUTED, anchor="w", justify="left").pack(fill="x")
 
         self.list = ctk.CTkScrollableFrame(self)
@@ -241,7 +242,7 @@ class TodoPanel(ctk.CTkFrame):
             self.me = store.author
             if store.path.exists():
                 self.doc = store.read()
-                self.status.configure(text="Local copy - not synced yet")
+                self.status.configure(text=t("Local copy - not synced yet"))
         except (TodoError, OSError):
             pass
 
@@ -290,7 +291,7 @@ class TodoPanel(ctk.CTkFrame):
                                                   f"Task updated: {fields['text'][:60]}"))
 
     def delete(self, item: TodoItem) -> None:
-        if messagebox.askyesno("Delete task", f"Delete this task for everyone?\n\n{item.text}", parent=self):
+        if messagebox.askyesno(t("Delete task"), t("Delete this task for everyone?\n\n{task}", task=item.text), parent=self):
             self._apply(lambda _me: op_delete(item.id), f"Task deleted: {item.text[:60]}")
 
     # ------------------------------------------------------------------ #
@@ -320,11 +321,11 @@ class TodoPanel(ctk.CTkFrame):
             child.destroy()
         items = self.visible_items()
         if self.doc is None:
-            ctk.CTkLabel(self.list, text="Click ⟳ Refresh to load the shared to-do list.",
+            ctk.CTkLabel(self.list, text=t("Click ⟳ Refresh to load the shared to-do list."),
                          text_color=MUTED).grid(row=0, column=0, columnspan=4, sticky="w", padx=8, pady=8)
             return
         if not items:
-            ctk.CTkLabel(self.list, text="No tasks here.", text_color=MUTED).grid(
+            ctk.CTkLabel(self.list, text=t("No tasks here."), text_color=MUTED).grid(
                 row=0, column=0, columnspan=4, sticky="w", padx=8, pady=8)
         today = date.today()
         for row, item in enumerate(items):
@@ -345,9 +346,9 @@ class TodoPanel(ctk.CTkFrame):
             color = OVERDUE if item.is_overdue(today) else (DONE if item.done else MUTED)
             ctk.CTkLabel(self.list, text=" · ".join(d for d in details if d), anchor="w", text_color=color,
                          font=ctk.CTkFont(size=12)).grid(row=row * 2 + 1, column=1, sticky="w", pady=(0, 4))
-            ctk.CTkButton(self.list, text="Edit", width=56, height=24, fg_color="transparent", border_width=1,
+            ctk.CTkButton(self.list, text=t("Edit"), width=56, height=24, fg_color="transparent", border_width=1,
                           command=lambda i=item: self.edit(i)).grid(row=row * 2, column=2, rowspan=2, padx=4)
-            ctk.CTkButton(self.list, text="Delete", width=64, height=24, fg_color="transparent", border_width=1,
+            ctk.CTkButton(self.list, text=t("Delete"), width=64, height=24, fg_color="transparent", border_width=1,
                           command=lambda i=item: self.delete(i)).grid(row=row * 2, column=3, rowspan=2, padx=(0, 6))
         open_count = sum(not i.done for i in self.doc.items)
         overdue = sum(i.is_overdue(today) for i in self.doc.items)

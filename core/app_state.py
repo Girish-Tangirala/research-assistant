@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from core.credentials import host_of
+from core.i18n import LANGUAGES
 
 URL_RE = re.compile(r"^(https://|http://|ssh://|git@)\S+$")
 CREDENTIAL_URL_RE = re.compile(r"^https?://[^/@\s]+:[^/@\s]*@")
@@ -210,6 +211,7 @@ class AppState:
     compile_before_commit: bool = True
     web_search: bool = True
     appearance: str = "Dark"
+    language: str = "en"          # interface only; papers are always written in English
     preview: bool = True
     confirm_push: bool = True
     show_preview: bool = True
@@ -263,6 +265,7 @@ class AppState:
             compile_before_commit=bool(data.get("compile_before_commit", True)),
             web_search=bool(data.get("web_search", True)),
             appearance=data.get("appearance") if data.get("appearance") in APPEARANCES else "Dark",
+            language=data.get("language") if data.get("language") in LANGUAGES else "en",
             preview=bool(data.get("preview", True)),
             confirm_push=bool(data.get("confirm_push", True)),
             show_preview=bool(data.get("show_preview", True)),

@@ -10,6 +10,7 @@ from core.credentials import CredentialError, host_of, mask
 from core.events import EventKind
 from gui.dialogs import ClaudeLoginDialog, GitLoginDialog, OpenAlexKeyDialog
 from gui.menubar import AccountSection
+from core.i18n import t
 
 
 class AccountsMixin:
@@ -84,7 +85,7 @@ class AccountsMixin:
         host = host_of(self.app_state.todo_repo.url)
         if host:
             self._safe(lambda: self.store.clear_git(host))
-            self.panel.append(EventKind.INFO, f"Signed out of {host}.")
+            self.panel.append(EventKind.INFO, t("Signed out of {host}.", host=host))
 
     def _ensure_claude(self, then: Callable[[], None], required: bool = True, reason: str = "") -> None:
         if not reason and self._safe(self.store.get_claude_key):
@@ -95,7 +96,7 @@ class AccountsMixin:
             if ok or not required:
                 then()
             else:
-                self.panel.append(EventKind.WARNING, "Claude sign-in is required for this workflow.")
+                self.panel.append(EventKind.WARNING, t("Claude sign-in is required for this workflow."))
 
         ClaudeLoginDialog(self, self.store, self.config_.llm.model, done, reason=reason)
 
@@ -113,7 +114,7 @@ class AccountsMixin:
             if ok or not required:
                 then()
             else:
-                self.panel.append(EventKind.WARNING, f"Sign in to {host} to sync this paper.")
+                self.panel.append(EventKind.WARNING, t("Sign in to {host} to sync this paper.", host=host))
 
         GitLoginDialog(self, self.store, host, url, self.app_state.author_name, self.app_state.author_email,
                        done, reason=reason)
@@ -123,7 +124,7 @@ class AccountsMixin:
 
     def _logout_claude(self) -> None:
         self._safe(self.store.clear_claude_key)
-        self.panel.append(EventKind.INFO, "Signed out of Claude.")
+        self.panel.append(EventKind.INFO, t("Signed out of Claude."))
 
     def _login_git(self) -> None:
         self._ensure_git(self.app_state.current, then=lambda: None, required=False, reason="Update your Git credentials.")
@@ -132,11 +133,11 @@ class AccountsMixin:
         host, _ = self._paper_host(self.app_state.current)
         if host:
             self._safe(lambda: self.store.clear_git(host))
-            self.panel.append(EventKind.INFO, f"Signed out of {host}.")
+            self.panel.append(EventKind.INFO, t("Signed out of {host}.", host=host))
 
     def _login_openalex(self) -> None:
         OpenAlexKeyDialog(self, self.store, lambda _ok: None)
 
     def _logout_openalex(self) -> None:
         self._safe(self.store.clear_openalex_key)
-        self.panel.append(EventKind.INFO, "OpenAlex key removed.")
+        self.panel.append(EventKind.INFO, t("OpenAlex key removed."))

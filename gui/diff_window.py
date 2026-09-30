@@ -8,6 +8,7 @@ from pathlib import Path
 import customtkinter as ctk
 
 from core.events import ProposedChange
+from core.i18n import t
 
 DIFF_COLORS = {
     "add": "#3fb950",
@@ -40,8 +41,9 @@ class DiffWindow(ctk.CTkToplevel):
         diff = change.unified_diff()
         added = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
         removed = sum(1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---"))
-        ctk.CTkLabel(header, text=f"{change.rel_path}   +{added} / −{removed} lines   "
-                                  f"(repository: {change.repo_root})",
+        ctk.CTkLabel(header, text=t("{path}   +{added} / −{removed} lines   (repository: {repo})",
+                                    path=change.rel_path, added=added, removed=removed,
+                                    repo=change.repo_root),
                      text_color=DIFF_COLORS["meta"], anchor="w").pack(fill="x", padx=10, pady=(0, 8))
 
         if change.is_binary:
@@ -56,12 +58,12 @@ class DiffWindow(ctk.CTkToplevel):
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.pack(fill="x", padx=12, pady=(6, 12))
-        ctk.CTkButton(buttons, text="Reject", fg_color="#6e2b2b", hover_color="#8b3535", width=140,
+        ctk.CTkButton(buttons, text=t("Reject"), fg_color="#6e2b2b", hover_color="#8b3535", width=140,
                       command=lambda: self._decide(False)).pack(side="right", padx=(8, 0))
-        ctk.CTkButton(buttons, text="Approve & Apply", fg_color="#1f6f3a", hover_color="#27894a", width=180,
+        ctk.CTkButton(buttons, text=t("Approve & Apply"), fg_color="#1f6f3a", hover_color="#27894a", width=180,
                       command=lambda: self._decide(True)).pack(side="right")
-        ctk.CTkLabel(buttons, text="Approved changes are written, compiled, committed on a feature branch "
-                                   "and pushed (if enabled).",
+        ctk.CTkLabel(buttons, text=t("Approved changes are written, compiled, committed on a feature branch "
+                                   "and pushed (if enabled)."),
                      text_color=DIFF_COLORS["meta"]).pack(side="left")
 
         self.after(100, self._focus)

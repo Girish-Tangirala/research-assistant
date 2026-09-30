@@ -15,6 +15,7 @@ import customtkinter as ctk
 
 from core.events import EventKind
 from gui.task_forms import FORMS, Form, FormContext
+from core.i18n import Choices, t
 
 LOG_COLORS = {
     EventKind.INFO: "#c9d1d9", EventKind.STATE: "#d2a8ff", EventKind.THOUGHT: "#8b949e",
@@ -54,9 +55,12 @@ class TaskPanel(ctk.CTkFrame):
 
         picker = ctk.CTkFrame(self, fg_color="transparent")
         picker.grid(row=0, column=0, sticky="ew")
-        ctk.CTkLabel(picker, text="Task", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(2, 8))
-        self.selector = ctk.CTkOptionMenu(picker, values=task_names, command=self.select, width=260,
-                                          dynamic_resizing=False)
+        ctk.CTkLabel(picker, text=t("Task"), font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(2, 8))
+        # The task names are the keys of WORKFLOWS and FORMS, so they stay English inside.
+        self.tasks = Choices(task_names)
+        self.selector = ctk.CTkOptionMenu(picker, values=self.tasks.labels, width=260,
+                                          dynamic_resizing=False,
+                                          command=lambda label: self.select(self.tasks.value(label)))
         self.selector.pack(side="left", fill="x", expand=True)
         self.params = ctk.CTkScrollableFrame(self, height=300)
         self.params.grid(row=1, column=0, sticky="ew", pady=10)
@@ -66,14 +70,14 @@ class TaskPanel(ctk.CTkFrame):
 
         controls = ctk.CTkFrame(self, fg_color="transparent")
         controls.grid(row=2, column=0, sticky="ew")
-        self.run_button = ctk.CTkButton(controls, text="▶  Run", width=110, command=self._on_run)
+        self.run_button = ctk.CTkButton(controls, text=t("▶  Run"), width=110, command=self._on_run)
         self.run_button.pack(side="left")
-        self.cancel_button = ctk.CTkButton(controls, text="■  Cancel", width=90, state="disabled",
+        self.cancel_button = ctk.CTkButton(controls, text=t("■  Cancel"), width=90, state="disabled",
                                            fg_color="#6e2b2b", hover_color="#8b3535", command=cancel)
         self.cancel_button.pack(side="left", padx=8)
-        ctk.CTkButton(controls, text="Clear log", width=76, fg_color="transparent", border_width=1,
+        ctk.CTkButton(controls, text=t("Clear log"), width=76, fg_color="transparent", border_width=1,
                       command=lambda: self.log_box.delete("1.0", "end")).pack(side="left")
-        self.state_label = ctk.CTkLabel(controls, text="State: Idle", font=ctk.CTkFont(weight="bold"))
+        self.state_label = ctk.CTkLabel(controls, text=t("State: Idle"), font=ctk.CTkFont(weight="bold"))
         self.state_label.pack(side="right", padx=8)
         self.progress = ctk.CTkProgressBar(controls, mode="determinate", width=80)
         self.progress.pack(side="right", padx=8)
@@ -82,21 +86,22 @@ class TaskPanel(ctk.CTkFrame):
         self.tabs = ctk.CTkTabview(self)
         self.tabs.grid(row=3, column=0, sticky="nsew", pady=(10, 0))
         mono = ctk.CTkFont(family="Consolas", size=13)
-        self.log_box = ctk.CTkTextbox(self.tabs.add("Live Log"), font=mono, wrap="word")
+        self.tab_names = Choices(["Live Log", "Report", "To-Do"][:2])   # To-Do is its own column now
+        self.log_box = ctk.CTkTextbox(self.tabs.add(self.tab_names.label("Live Log")), font=mono, wrap="word")
         self.log_box.pack(fill="both", expand=True)
         for kind, color in LOG_COLORS.items():
             self.log_box.tag_config(kind.value, foreground=color)
 
-        report_tab = self.tabs.add("Report")
+        report_tab = self.tabs.add(self.tab_names.label("Report"))
         bar = ctk.CTkFrame(report_tab, fg_color="transparent")
         bar.pack(fill="x", pady=(0, 6))
-        self.open_report_button = ctk.CTkButton(bar, text="Open report file", width=140, state="disabled",
+        self.open_report_button = ctk.CTkButton(bar, text=t("Open report file"), width=140, state="disabled",
                                                 command=lambda: self._report_path and open_path(self._report_path))
         self.open_report_button.pack(side="left")
-        ctk.CTkButton(bar, text="Open reports folder", width=150, fg_color="transparent", border_width=1,
+        ctk.CTkButton(bar, text=t("Open reports folder"), width=150, fg_color="transparent", border_width=1,
                       command=lambda: self._report_path and open_path(self._report_path.parent)).pack(
             side="left", padx=8)
-        ctk.CTkLabel(bar, text="Click a link to open the paper in your browser.", text_color=MUTED).pack(side="left")
+        ctk.CTkLabel(bar, text=t("Click a link to open the paper in your browser."), text_color=MUTED).pack(side="left")
         self.report_box = ctk.CTkTextbox(report_tab, font=ctk.CTkFont(size=14), wrap="word")
         self.report_box.pack(fill="both", expand=True)
         self.report_box.tag_config("link", foreground="#58a6ff", underline=True)
@@ -107,7 +112,7 @@ class TaskPanel(ctk.CTkFrame):
     # Parameters
     # ------------------------------------------------------------------ #
     def select(self, name: str) -> None:
-        self.selector.set(name)
+        self.selector.set(self.tasks.label(name))
         for form in self.forms.values():
             form.frame.grid_forget()
         self.forms[name].frame.grid(row=0, column=0, sticky="ew")
@@ -140,7 +145,7 @@ class TaskPanel(ctk.CTkFrame):
             self.progress.set(0)
 
     def set_state(self, text: str) -> None:
-        self.state_label.configure(text=f"State: {text}")
+        self.state_label.configure(text=t("State: {state}", state=text))
 
     def append(self, kind: EventKind, message: str) -> None:
         box = self.log_box
@@ -174,4 +179,4 @@ class TaskPanel(ctk.CTkFrame):
                 box.tag_bind(tag, "<Button-1>", lambda _e, u=url: webbrowser.open(u))
         self._report_path = Path(path) if path else None
         self.open_report_button.configure(state="normal" if path else "disabled")
-        self.tabs.set("Report")
+        self.tabs.set(self.tab_names.label("Report"))

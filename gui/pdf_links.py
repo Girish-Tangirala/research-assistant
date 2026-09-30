@@ -29,6 +29,7 @@ from core.synctex import find_synctex_tool
 from core.workflows import CitationAuditWorkflow, SafeEditWorkflow
 from gui.editor_mixin import AGENT_MODE, TODO_MODE
 from gui.panels import open_path
+from core.i18n import t
 
 EDIT_TAB = SafeEditWorkflow.name
 FIGURES_TAB = AddFiguresWorkflow.name
@@ -46,10 +47,10 @@ class PdfLinkMixin:
     def _list_figures(self) -> list[FigureRef]:
         root = self._paper_root()
         if root is None or not root.is_dir():
-            self.panel.append(EventKind.WARNING, "The paper is not cloned yet - click 'Sync paper' first.")
+            self.panel.append(EventKind.WARNING, t("The paper is not cloned yet - click 'Sync paper' first."))
             return []
         figures = list_figures(root)
-        self.panel.append(EventKind.INFO, f"Found {len(figures)} figure(s).")
+        self.panel.append(EventKind.INFO, t("Found {count} figure(s).", count=len(figures)))
         return figures
 
     # ------------------------------------------------------------------ #
@@ -64,7 +65,7 @@ class PdfLinkMixin:
         if result.kind == KIND_PROPOSED:  # compiled from the preview mirror of the repository
             source_root = self._preview_builder().base / "src" / repo.name
         tool = find_synctex_tool(self.config_.latex)
-        self.preview.set_source_status("Looking up the source…")
+        self.preview.set_source_status(t("Looking up the source…"))
 
         def work() -> None:
             try:
@@ -105,8 +106,8 @@ class PdfLinkMixin:
 
     def _busy_hint(self) -> None:
         if self._workflow_running():
-            self.panel.append(EventKind.INFO, "A task is running - the form is filled in; run it when the task "
-                                              "has finished.")
+            self.panel.append(EventKind.INFO, t("A task is running - the form is filled in; run it when the task "
+                                              "has finished."))
 
     def _default_action(self, target: ClickTarget) -> None:
         self.show_mode(AGENT_MODE)
@@ -114,21 +115,23 @@ class PdfLinkMixin:
             self.replace_figure_at(target)
         elif target.kind == KIND_BIBLIOGRAPHY:
             self.panel.select(REFERENCES_TAB)
-            self.panel.append(EventKind.INFO, "Bibliography clicked - add references here, or run the "
-                                              "Citation & BibTeX Audit.")
+            self.panel.append(EventKind.INFO, t("Bibliography clicked - add references here, or run the "
+                                              "Citation & BibTeX Audit."))
         elif target.kind == KIND_PREAMBLE:
-            self.panel.append(EventKind.INFO, f"That comes from the preamble ({target.rel_path}, line "
-                                              f"{target.line}) - it is not part of a section.")
+            self.panel.append(EventKind.INFO,
+                              t("That comes from the preamble ({path}, line {line}) - it is not part of a "
+                                "section.", path=target.rel_path, line=target.line))
         elif not target.section:
-            self.panel.append(EventKind.WARNING, f"{target.rel_path}, line {target.line} is not inside a section "
-                                                 "- use a Custom Agent Task for text outside sections.")
+            self.panel.append(EventKind.WARNING,
+                              t("{path}, line {line} is not inside a section - use a Custom Agent Task for "
+                                "text outside sections.", path=target.rel_path, line=target.line))
         else:
             self.edit_section_at(target)
 
     def edit_source_at(self, target: ClickTarget) -> None:
         """Open the clicked source line in the .tex editor."""
         if not target.rel_path:
-            self.preview.set_source_status("No source line found for that spot.", error=True)
+            self.preview.set_source_status(t("No source line found for that spot."), error=True)
             return
         note = ""
         if self.preview.result and self.preview.result.kind == KIND_PROPOSED:
@@ -178,30 +181,31 @@ class PdfLinkMixin:
         menu = tk.Menu(self, tearoff=False)
         section = target.section
         if target.rel_path:
-            menu.add_command(label=f"Edit in the .tex editor ({target.rel_path}, line {target.line})",
+            menu.add_command(label=t("Edit in the .tex editor ({path}, line {line})", path=target.rel_path, line=target.line),
                              command=lambda: self.edit_source_at(target))
             menu.add_separator()
         if target.kind == KIND_FIGURE and target.figure is not None:
-            menu.add_command(label=f"Replace this figure ({target.figure.graphic})",
+            menu.add_command(label=t("Replace this figure ({image})", image=target.figure.graphic),
                              command=lambda: self.replace_figure_at(target))
         if section:
-            menu.add_command(label=f"Edit section '{section}'", command=lambda: self.edit_section_at(target))
-            menu.add_command(label=f"Add a figure to '{section}'", command=lambda: self.add_figure_at(target))
-            menu.add_command(label=f"Add references to '{section}'", command=lambda: self.add_references_at(target))
-            menu.add_command(label=f"New to-do for '{section}'", command=lambda: self.todo_at(target))
+            menu.add_command(label=t("Edit section '{section}'", section=section), command=lambda: self.edit_section_at(target))
+            menu.add_command(label=t("Add a figure to '{section}'", section=section), command=lambda: self.add_figure_at(target))
+            menu.add_command(label=t("Add references to '{section}'", section=section), command=lambda: self.add_references_at(target))
+            menu.add_command(label=t("New to-do for '{section}'", section=section), command=lambda: self.todo_at(target))
         if target.cite_keys or target.kind == KIND_BIBLIOGRAPHY:
             keys = ", ".join(target.cite_keys[:3])
-            menu.add_command(label=f"Check citations{f' ({keys})' if keys else ''}",
+            menu.add_command(label=t("Check citations ({keys})", keys=keys) if keys
+                             else t("Check citations"),
                              command=lambda: (self.show_mode(AGENT_MODE), self.panel.select(AUDIT_TAB)))
         if target.rel_path:
             if menu.index("end") is not None:
                 menu.add_separator()
-            menu.add_command(label=f"Open {target.rel_path} in another program",
+            menu.add_command(label=t("Open {path} in another program", path=target.rel_path),
                              command=lambda: self._open_source(target))
-            menu.add_command(label="Copy source location",
+            menu.add_command(label=t("Copy source location"),
                              command=lambda: self._copy(f"{target.rel_path}:{target.line}"))
         if menu.index("end") is None:
-            menu.add_command(label="Nothing to do here", state="disabled")
+            menu.add_command(label=t("Nothing to do here"), state="disabled")
         try:
             menu.tk_popup(x_root, y_root)
         finally:
@@ -216,4 +220,4 @@ class PdfLinkMixin:
     def _copy(self, text: str) -> None:
         self.clipboard_clear()
         self.clipboard_append(text)
-        self.panel.append(EventKind.INFO, f"Copied: {text}")
+        self.panel.append(EventKind.INFO, t("Copied: {text}", text=text))

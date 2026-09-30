@@ -18,6 +18,7 @@ from core.credentials import host_of
 from core.events import EventKind
 from core.git_manager import GitManager
 from gui.dialogs import _Dialog, run_in_background
+from core.i18n import t
 
 HELP = ("One shared to-do list for all your papers, kept in a small Git repository of its own - "
         "not in a paper, so a to-do change never touches a manuscript and never waits for Sync.\n\n"
@@ -33,9 +34,9 @@ class TodoRepoDialog(_Dialog):
                  on_save: Callable[[TodoRepoSettings], None]) -> None:
         super().__init__(master, "Shared to-do list", "Shared to-do list", HELP)
         self.on_save = on_save
-        self.url = self.entry("Repository link", settings.url,
+        self.url = self.entry(t("Repository link"), settings.url,
                               placeholder="https://github.com/you/research-todo.git")
-        self.branch = self.entry("Branch (optional)", settings.branch, placeholder="leave empty for the default")
+        self.branch = self.entry(t("Branch (optional)"), settings.branch, placeholder="leave empty for the default")
         self.hint = ctk.CTkLabel(self.body, text="", text_color="#8b949e", anchor="w", justify="left",
                                  wraplength=460)
         self.hint.grid(row=self._row, column=0, sticky="ew", pady=(0, 8))
@@ -71,7 +72,7 @@ class TodoSetupMixin:
         self.todo.doc = None
         self.todo.paper_changed()
         if settings.configured:
-            self.panel.append(EventKind.INFO, f"Shared to-do list: {settings.url}")
+            self.panel.append(EventKind.INFO, t("Shared to-do list: {url}", url=settings.url))
             self.todo.refresh()
 
     def _migrate_todo_lists(self) -> None:
@@ -81,19 +82,19 @@ class TodoSetupMixin:
 
         papers = self.app_state.papers
         if not papers:
-            messagebox.showinfo("Move the to-do lists", "There are no papers to move a list from.", parent=self)
+            messagebox.showinfo(t("Move the to-do lists"), t("There are no papers to move a list from."), parent=self)
             return
         if not messagebox.askyesno(
-                "Move the to-do lists",
-                f"Move the tasks from {len(papers)} paper(s) into the shared list, then delete todo.md "
-                "from each paper?\n\nThe deletion is committed on this computer only - press Sync on each "
-                "paper afterwards to remove it from Overleaf too.\n\nTasks already in the shared list are "
-                "left alone, so this is safe to run twice.", parent=self):
+                t("Move the to-do lists"),
+                t("Move the tasks from {count} paper(s) into the shared list, then delete todo.md from "
+                  "each paper?\n\nThe deletion is committed on this computer only - press Sync on each "
+                  "paper afterwards to remove it from Overleaf too.\n\nTasks already in the shared list "
+                  "are left alone, so this is safe to run twice.", count=len(papers)), parent=self):
             return
         try:
             store = self.todo.ctx.make_store()
         except TodoError as exc:
-            messagebox.showwarning("Move the to-do lists", str(exc), parent=self)
+            messagebox.showwarning(t("Move the to-do lists"), str(exc), parent=self)
             return
 
         def job():
@@ -102,7 +103,7 @@ class TodoSetupMixin:
 
         def ok(report) -> None:
             self.panel.append(EventKind.SUCCESS if report.changed else EventKind.INFO, report.as_text())
-            messagebox.showinfo("Move the to-do lists", report.as_text(), parent=self)
+            messagebox.showinfo(t("Move the to-do lists"), report.as_text(), parent=self)
             self.todo.refresh()
 
         run_in_background(self, job, ok, self._todo_error)

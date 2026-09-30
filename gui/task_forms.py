@@ -57,10 +57,10 @@ class FileList(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.box = ctk.CTkTextbox(self, height=height, state="disabled")
         self.box.grid(row=0, column=0, rowspan=3, sticky="ew")
-        ctk.CTkButton(self, text="Add files…", width=110, command=self.add).grid(row=0, column=1, padx=(6, 0), pady=2)
-        ctk.CTkButton(self, text="Remove last", width=110, fg_color="transparent", border_width=1,
+        ctk.CTkButton(self, text=t("Add files…"), width=110, command=self.add).grid(row=0, column=1, padx=(6, 0), pady=2)
+        ctk.CTkButton(self, text=t("Remove last"), width=110, fg_color="transparent", border_width=1,
                       command=self.remove_last).grid(row=1, column=1, padx=(6, 0), pady=2)
-        ctk.CTkButton(self, text="Clear", width=110, fg_color="transparent", border_width=1,
+        ctk.CTkButton(self, text=t("Clear"), width=110, fg_color="transparent", border_width=1,
                       command=self.clear).grid(row=2, column=1, padx=(6, 0), pady=2)
         self._render()
 
@@ -161,7 +161,7 @@ class Form:
         combo = ctk.CTkComboBox(row, values=[], width=200)
         combo.set("")
         combo.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(row, text="Load sections", width=120,
+        ctk.CTkButton(row, text=t("Load sections"), width=120,
                       command=lambda: self.ctx.refresh_sections()).pack(side="left", padx=(6, 0))
         self.ctx.section_combos.append((combo, optional))
         self.inputs[key] = combo
@@ -194,13 +194,13 @@ class LiteratureForm(Form):
     workflow = LiteratureReviewWorkflow
 
     def build(self) -> None:
-        self.entry("topic", "Topic", placeholder="Blank = derived from the selected paper's title and abstract")
-        self.textbox("focus", "Focus (optional) - sub-questions, methods, exclusions", height=55)
-        self.entry("max_papers", "Approx. number of papers", "20", width=120)
-        self.entry("year_from", "Published from (year, optional)", placeholder="e.g. 2018", width=120)
-        self.label("Searches OpenAlex, Crossref and arXiv (plus Claude web search if enabled). Read-only: "
+        self.entry("topic", t("Topic"), placeholder="Blank = derived from the selected paper's title and abstract")
+        self.textbox("focus", t("Focus (optional) - sub-questions, methods, exclusions"), height=55)
+        self.entry("max_papers", t("Approx. number of papers"), "20", width=120)
+        self.entry("year_from", t("Published from (year, optional)"), placeholder="e.g. 2018", width=120)
+        self.label(t("Searches OpenAlex, Crossref and arXiv (plus Claude web search if enabled). Read-only: "
                    "writes a review with a link for every paper,\na verification table and a .bib of new "
-                   "candidates.", muted=True)
+                   "candidates."), muted=True)
 
     def params(self) -> dict[str, Any]:
         return {"topic": self.value("topic"), "focus": self.value("focus"),
@@ -212,24 +212,24 @@ class ReferencesForm(Form):
     workflow = AddReferencesWorkflow
 
     def build(self) -> None:
-        self.textbox("identifiers", "DOIs, arXiv IDs / links or paper titles - one per line", height=80)
-        self.label("…and/or import entries from .bib files on your computer")
+        self.textbox("identifiers", t("DOIs, arXiv IDs / links or paper titles - one per line"), height=80)
+        self.label(t("…and/or import entries from .bib files on your computer"))
         self.files = FileList(self.frame, "Choose .bib files", BIB_TYPES, height=50)
         self._place(self.files)
-        self.label("Add to .bib file (blank = first editable .bib of the paper, or a new references.bib)")
+        self.label(t("Add to .bib file (blank = first editable .bib of the paper, or a new references.bib)"))
         row = ctk.CTkFrame(self.frame, fg_color="transparent")
         combo = ctk.CTkComboBox(row, values=[""], width=200)
         combo.set("")
         combo.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(row, text="List .bib files", width=120, command=self.ctx.refresh_bibs).pack(side="left", padx=(6, 0))
+        ctk.CTkButton(row, text=t("List .bib files"), width=120, command=self.ctx.refresh_bibs).pack(side="left", padx=(6, 0))
         self.ctx.bib_combos.append(combo)
         self.inputs["target_bib"] = combo
         self._place(row)
-        self.section_picker("cite_section", "Cite them in section (optional)", optional=True)
+        self.section_picker("cite_section", t("Cite them in section (optional)"), optional=True)
         self.checkbox("write_sentence", "Let Claude write a sentence citing them there (otherwise a plain \\cite{} "
                                         "is added)", checked=True)
-        self.label("Metadata comes from OpenAlex / Crossref / arXiv or your file - never invented. Duplicates are "
-                   "skipped; read-only (Zotero) .bib files are never edited.", muted=True)
+        self.label(t("Metadata comes from OpenAlex / Crossref / arXiv or your file - never invented. Duplicates are "
+                   "skipped; read-only (Zotero) .bib files are never edited."), muted=True)
 
     def focus(self, section: str) -> None:
         self.inputs["cite_section"].set(section)
@@ -245,10 +245,11 @@ class EditForm(Form):
 
     def build(self) -> None:
         self.picked = self.note()
-        self.section_picker("section", "Section")
-        self.entry("edit_path", "File (optional)", placeholder="Repo-relative path; blank = search all .tex files")
-        self.textbox("instructions", "Editing instructions",
-                     "Improve clarity, flow and concision. Keep all technical content.")
+        self.section_picker("section", t("Section"))
+        self.entry("edit_path", t("File (optional)"),
+                   placeholder=t("Repo-relative path; blank = search all .tex files"))
+        self.textbox("instructions", t("Editing instructions"),
+                     t("Improve clarity, flow and concision. Keep all technical content."))
 
     def focus(self, section: str, path: str, note: str) -> None:
         """Pre-fill from a click in the PDF."""
@@ -266,53 +267,57 @@ class FiguresForm(Form):
     MODES = ("Add new figures", "Replace a figure")
 
     def build(self) -> None:
-        self.mode = ctk.CTkSegmentedButton(self.frame, values=list(self.MODES), command=self.set_mode)
+        # Shown translated, compared as English (set_mode is also called from the PDF click).
+        self.mode_choices = Choices(list(self.MODES))
+        self.mode = ctk.CTkSegmentedButton(
+            self.frame, values=self.mode_choices.labels,
+            command=lambda label: self.set_mode(self.mode_choices.value(label)))
         self._place(self.mode, sticky="w")
         self.picked = self.note()
 
         self._group = self.add_widgets = []
-        self.label("Images from anywhere on your computer (PNG, JPG, PDF; TIFF/BMP/GIF/WebP are converted)")
+        self.label(t("Images from anywhere on your computer (PNG, JPG, PDF; TIFF/BMP/GIF/WebP are converted)"))
         self.files = FileList(self.frame, "Choose images", IMAGE_TYPES)
         self._place(self.files)
-        self.section_picker("section", "Place the figures at the end of section")
-        self.textbox("caption", "Caption (optional, used when adding a single image)", height=45)
-        self.entry("width", "Width", r"0.8\linewidth", width=160)
-        self.checkbox("draft_captions", "Let Claude draft captions by looking at each image", checked=True)
-        self.checkbox("reference_sentence", "Add a sentence that refers to each figure (Figure~\\ref{…})", checked=True)
-        self.label("Images are copied into the paper's figures folder only after you approve them.", muted=True)
+        self.section_picker("section", t("Place the figures at the end of section"))
+        self.textbox("caption", t("Caption (optional, used when adding a single image)"), height=45)
+        self.entry("width", t("Width"), r"0.8\linewidth", width=160)
+        self.checkbox("draft_captions", t("Let Claude draft captions by looking at each image"), checked=True)
+        self.checkbox("reference_sentence", t("Add a sentence that refers to each figure (Figure~\\ref{…})"), checked=True)
+        self.label(t("Images are copied into the paper's figures folder only after you approve them."), muted=True)
 
         self._group = self.replace_widgets = []
         self.figures: dict[str, FigureRef] = {}
-        self.label("Figure to replace (or click a figure in the PDF preview)")
+        self.label(t("Figure to replace (or click a figure in the PDF preview)"))
         row = ctk.CTkFrame(self.frame, fg_color="transparent")
         self.figure_combo = ctk.CTkComboBox(row, values=[], width=200, command=self._figure_chosen)
         self.figure_combo.set("")
         self.figure_combo.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(row, text="List figures", width=120, command=self.refresh_figures).pack(side="left", padx=(6, 0))
+        ctk.CTkButton(row, text=t("List figures"), width=120, command=self.refresh_figures).pack(side="left", padx=(6, 0))
         self._place(row)
         self.figure_info = ctk.CTkLabel(self.frame, text="", text_color=MUTED, anchor="w", justify="left",
                                         wraplength=640)
         self._place(self.figure_info, pady=(0, 4), sticky="w")
-        self.label("New image")
+        self.label(t("New image"))
         row = ctk.CTkFrame(self.frame, fg_color="transparent")
-        self.new_image = ctk.CTkEntry(row, placeholder_text="Choose the new image file")
+        self.new_image = ctk.CTkEntry(row, placeholder_text=t("Choose the new image file"))
         self.new_image.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(row, text="Choose image…", width=120, command=self._choose_image).pack(side="left", padx=(6, 0))
+        ctk.CTkButton(row, text=t("Choose image…"), width=120, command=self._choose_image).pack(side="left", padx=(6, 0))
         self._place(row)
-        self.textbox("new_caption", "New caption (optional - blank keeps the current caption)", height=45)
-        self.checkbox("update_caption", "Let Claude update the caption for the new image", checked=False)
-        self.label("Same file type: the image file is replaced in place (no LaTeX change). Otherwise the new file "
-                   "is added\nand the figure points to it. Nothing changes until you approve.", muted=True)
+        self.textbox("new_caption", t("New caption (optional - blank keeps the current caption)"), height=45)
+        self.checkbox("update_caption", t("Let Claude update the caption for the new image"), checked=False)
+        self.label(t("Same file type: the image file is replaced in place (no LaTeX change). Otherwise the new file "
+                   "is added\nand the figure points to it. Nothing changes until you approve."), muted=True)
         self._group = None
         self.set_mode(self.MODES[0])
 
     # -- modes ---------------------------------------------------------- #
     @property
     def replacing(self) -> bool:
-        return self.mode.get() == self.MODES[1]
+        return self.mode_choices.value(self.mode.get()) == self.MODES[1]
 
     def set_mode(self, mode: str) -> None:
-        self.mode.set(mode)
+        self.mode.set(self.mode_choices.label(mode))
         shown, hidden = ((self.replace_widgets, self.add_widgets) if mode == self.MODES[1]
                          else (self.add_widgets, self.replace_widgets))
         for widget in hidden:
@@ -341,11 +346,12 @@ class FiguresForm(Form):
             self.figure_info.configure(text="")
             return
         caption = ref.caption if len(ref.caption) < 220 else ref.caption[:217] + "…"
-        self.figure_info.configure(text=f"Image: {ref.graphic}   ·   {ref.rel_path}, line {ref.start_line}\n"
-                                        f"Caption: {caption or '(none)'}")
+        self.figure_info.configure(text=t("Image: {image}   ·   {path}, line {line}\nCaption: {caption}",
+                                          image=ref.graphic, path=ref.rel_path, line=ref.start_line,
+                                          caption=caption or t("(none)")))
 
     def _choose_image(self) -> None:
-        name = filedialog.askopenfilename(parent=self.frame, title="Choose the new image", filetypes=IMAGE_TYPES)
+        name = filedialog.askopenfilename(parent=self.frame, title=t("Choose the new image"), filetypes=IMAGE_TYPES)
         if name:
             self.set_entry(self.new_image, name)
 
@@ -385,9 +391,9 @@ class AuditForm(Form):
     workflow = CitationAuditWorkflow
 
     def build(self) -> None:
-        self.label("Read-only check of the selected paper: missing or duplicate citation keys, missing or "
+        self.label(t("Read-only check of the selected paper: missing or duplicate citation keys, missing or "
                    "malformed DOIs,\nmissing required fields and unused entries. DOIs are never invented. "
-                   "No Claude sign-in needed.", muted=True)
+                   "No Claude sign-in needed."), muted=True)
 
     def params(self) -> dict[str, Any]:
         return {}
@@ -397,9 +403,9 @@ class CustomForm(Form):
     workflow = CustomAgentWorkflow
 
     def build(self) -> None:
-        self.textbox("goal", "Describe the task (the agent can read, search literature, edit, audit, compile and "
-                             "commit - every edit needs your approval)",
-                     "Read the paper and suggest a clearer abstract; stage the edit.", height=110)
+        self.textbox("goal", t("Describe the task (the agent can read, search literature, edit, audit, compile and "
+                             "commit - every edit needs your approval)"),
+                     t("Read the paper and suggest a clearer abstract; stage the edit."), height=110)
 
     def params(self) -> dict[str, Any]:
         return {"goal": self.value("goal")}
@@ -407,6 +413,7 @@ class CustomForm(Form):
 
 # Imported last: gui.results_form builds on Form/FileList above, so this module must be complete first.
 from gui.results_form import ResultsForm  # noqa: E402
+from core.i18n import Choices, t
 
 FORMS: dict[str, type[Form]] = {form.workflow.name: form for form in (
     LiteratureForm, ReferencesForm, EditForm, FiguresForm, ResultsForm, AuditForm, CustomForm)}

@@ -17,6 +17,7 @@ from core.agent_engine import with_identity
 from core.app_state import PaperSpec
 from core.events import EventKind
 from core.git_manager import GitManager, GitOperationError
+from core.i18n import Choices
 from core.project_layout import PROTECTED_FOLDERS
 from core.protection import ProtectionPolicy
 from gui.tex_editor import EditorContext, TexEditor
@@ -32,8 +33,11 @@ class EditorMixin:
 
     def _build_middle(self, parent: Any) -> ctk.CTkFrame:
         middle = ctk.CTkFrame(parent, fg_color="transparent")
-        self.mode_switch = ctk.CTkSegmentedButton(middle, values=[AGENT_MODE, EDITOR_MODE, TODO_MODE],
-                                                  command=self.show_mode)
+        # The three modes stay English inside the app - they are compared everywhere -
+        # while the switch shows them in the interface language.
+        self.modes = Choices([AGENT_MODE, EDITOR_MODE, TODO_MODE])
+        self.mode_switch = ctk.CTkSegmentedButton(
+            middle, values=self.modes.labels, command=lambda label: self.show_mode(self.modes.value(label)))
         self.mode_switch.pack(fill="x", pady=(0, 8))
         self._editor_paper: Path | None = None
         return middle
@@ -51,7 +55,7 @@ class EditorMixin:
 
         The to-do list belongs to no paper, so it leaves the click mode alone.
         """
-        self.mode_switch.set(mode)
+        self.mode_switch.set(self.modes.label(mode))
         preview = getattr(self, "preview", None)  # the preview pane is built after this column
         if preview is not None and preview.mode != "off" and mode != TODO_MODE:
             preview.set_click_mode("source" if mode == EDITOR_MODE else "agent")
@@ -108,7 +112,7 @@ class EditorMixin:
         if rel and (root / rel).is_file():
             self.open_in_editor(rel, line)
         else:
-            self.panel.append(EventKind.WARNING, f"{location} is not a file of this paper.")
+            self.panel.append(EventKind.WARNING, t("{location} is not a file of this paper.", location=location))
 
     # ------------------------------------------------------------------ #
     def _spec_for(self, root: Path) -> PaperSpec | None:

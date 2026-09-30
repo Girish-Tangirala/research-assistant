@@ -23,6 +23,7 @@ from core.credentials import (
     DEFAULT_GIT_USERNAMES, GIT_TOKEN_HELP, CredentialError, CredentialStore, GitCredential,
     host_of, verify_claude_key, verify_git_access, verify_openalex_key,
 )
+from core.i18n import t
 
 MUTED = "#8b949e"
 ERROR = "#f85149"
@@ -198,14 +199,14 @@ class _Dialog(ctk.CTkToplevel):
         widget.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
         if secret:
-            toggle = ctk.CTkCheckBox(self.body, text="Show", width=60,
+            toggle = ctk.CTkCheckBox(self.body, text=t("Show"), width=60,
                                      command=lambda: widget.configure(show="" if toggle.get() else "•"))
             toggle.grid(row=self._row, column=0, sticky="w", pady=(0, 10))
             self._row += 1
         return widget
 
     def finish_layout(self, primary: str, on_primary: Callable[[], None]) -> None:
-        ctk.CTkButton(self.buttons, text="Cancel", width=100, fg_color="transparent", border_width=1,
+        ctk.CTkButton(self.buttons, text=t("Cancel"), width=100, fg_color="transparent", border_width=1,
                       command=self.cancel).pack(side="right", padx=(8, 0))
         self.primary = ctk.CTkButton(self.buttons, text=primary, width=140, command=on_primary)
         self.primary.pack(side="right")
@@ -241,13 +242,13 @@ class ClaudeLoginDialog(_Dialog):
                            "and reused until you sign out or it stops working.")
         self.store, self.model, self.on_done = store, model, on_done
         self.link("Create or copy a key at console.anthropic.com →", "https://console.anthropic.com/settings/keys")
-        self.key = self.entry("API key", secret=True, placeholder="sk-ant-…")
+        self.key = self.entry(t("API key"), secret=True, placeholder="sk-ant-…")
         self.finish_layout("Sign in", self.submit)
         self.after(200, self.key.focus_set)
 
     def submit(self) -> None:
         key = self.key.get().strip()
-        self.busy("Verifying key…")
+        self.busy(t("Verifying key…"))
         run_in_background(self, lambda: verify_claude_key(key, self.model), lambda name: self._saved(key, name),
                           lambda exc: self.fail(str(exc)))
 
@@ -257,7 +258,7 @@ class ClaudeLoginDialog(_Dialog):
         except CredentialError as exc:
             self.fail(str(exc))
             return
-        self.status.configure(text=f"Signed in - {model_name} is available.", text_color=OK)
+        self.status.configure(text=t("Signed in - {model} is available.", model=model_name), text_color=OK)
         self.after(600, lambda: self.close(True))
 
     def close(self, ok: bool) -> None:
@@ -278,10 +279,10 @@ class GitLoginDialog(_Dialog):
         existing = store.get_git(host)
         self.label(GIT_TOKEN_HELP.get(host, "Create a personal access token with read/write access to "
                                             "repositories on this host."), color=MUTED)
-        self.username = self.entry("Username", existing.username if existing else DEFAULT_GIT_USERNAMES.get(host, ""))
-        self.token = self.entry("Access token", secret=True)
-        self.name = self.entry("Commit author name", author_name)
-        self.email = self.entry("Commit author email", author_email)
+        self.username = self.entry(t("Username"), existing.username if existing else DEFAULT_GIT_USERNAMES.get(host, ""))
+        self.token = self.entry(t("Access token"), secret=True)
+        self.name = self.entry(t("Commit author name"), author_name)
+        self.email = self.entry(t("Commit author email"), author_email)
         self.finish_layout("Sign in", self.submit)
         self.after(200, self.token.focus_set)
         self._result = ("", "")
@@ -290,10 +291,10 @@ class GitLoginDialog(_Dialog):
         username, token = self.username.get().strip(), self.token.get().strip()
         name, email = self.name.get().strip(), self.email.get().strip()
         if not (username and token):
-            self.fail("Username and token are required.")
+            self.fail(t("Username and token are required."))
             return
         if not name or not EMAIL_RE.match(email):
-            self.fail("Enter the name and a valid email to use for commits.")
+            self.fail(t("Enter the name and a valid email to use for commits."))
             return
         credential = GitCredential(self.host, username, token)
         can_verify = bool(self.verify_url) and host_of(self.verify_url) == self.host
@@ -313,7 +314,7 @@ class GitLoginDialog(_Dialog):
             self.fail(str(exc))
             return
         self._result = (name, email)
-        self.status.configure(text="Signed in.", text_color=OK)
+        self.status.configure(text=t("Signed in."), text_color=OK)
         self.after(500, lambda: self.close(True))
 
     def close(self, ok: bool) -> None:
@@ -330,12 +331,12 @@ class OpenAlexKeyDialog(_Dialog):
                          "OpenAlex budget 10×.")
         self.store, self.on_done = store, on_done
         self.link("Get a free key at openalex.org/settings/api →", "https://openalex.org/settings/api")
-        self.key = self.entry("API key", secret=True)
+        self.key = self.entry(t("API key"), secret=True)
         self.finish_layout("Save", self.submit)
 
     def submit(self) -> None:
         key = self.key.get().strip()
-        self.busy("Verifying key…")
+        self.busy(t("Verifying key…"))
         run_in_background(self, lambda: verify_openalex_key(key), lambda _v: self._saved(key),
                           lambda exc: self.fail(str(exc)))
 
@@ -365,56 +366,56 @@ class PaperDialog(_Dialog):
         self.old_name = spec.name if spec else None
         self.editing = editing
         self.other_names, self.papers_dir, self.on_save = other_names, papers_dir, on_save
-        self.name = self.entry("Paper name", spec.name if spec else "", placeholder="e.g. GNN folding paper")
-        self.url = self.entry("Overleaf or Git URL (optional)", spec.remote_url if spec else "",
+        self.name = self.entry(t("Paper name"), spec.name if spec else "", placeholder="e.g. GNN folding paper")
+        self.url = self.entry(t("Overleaf or Git URL (optional)"), spec.remote_url if spec else "",
                               placeholder="https://www.overleaf.com/project/<id>  or  https://github.com/<you>/<repo>")
-        self.label("Local folder")
+        self.label(t("Local folder"))
         row = ctk.CTkFrame(self.body, fg_color="transparent")
         row.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
-        self.path = ctk.CTkEntry(row, placeholder_text=f"blank = {papers_dir}\\<name>")
+        self.path = ctk.CTkEntry(row, placeholder_text=t("blank = {folder}\\<name>", folder=papers_dir))
         self.path.pack(side="left", fill="x", expand=True)
         if spec and spec.local_path:
             self.path.insert(0, spec.local_path)
         ctk.CTkButton(row, text="…", width=32, command=self._browse).pack(side="left", padx=(4, 0))
-        self.branch = self.entry("Branch (optional)", spec.branch if spec else "",
+        self.branch = self.entry(t("Branch (optional)"), spec.branch if spec else "",
                                  placeholder="blank = the repository's default branch (Overleaf: main)")
 
-        self.create = ctk.CTkCheckBox(self.body, text="Set up the folder structure for a new paper",
+        self.create = ctk.CTkCheckBox(self.body, text=t("Set up the folder structure for a new paper"),
                                       command=self._toggle_create)
         if not editing:
             self.create.select()
             self.create.grid(row=self._row, column=0, sticky="w", pady=(2, 4))
             self._row += 1
-        self.title_caption = self.label("Title of the paper (used in main.tex)")
-        self.title_entry = ctk.CTkEntry(self.body, width=460, placeholder_text="blank = the paper name")
+        self.title_caption = self.label(t("Title of the paper (used in main.tex)"))
+        self.title_entry = ctk.CTkEntry(self.body, width=460, placeholder_text=t("blank = the paper name"))
         self.title_entry.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
         folders = ", ".join(f"{f.name}/" for f in FOLDERS)
-        self.layout_note = self.label(f"Creates {folders} and a main.tex that compiles in Overleaf. "
-                                      "Existing files are never overwritten; data/ stays on this computer. "
-                                      "With a link, the Overleaf project is cloned first and the structure is "
-                                      "only added if it has no .tex files yet.",
+        self.layout_note = self.label(
+            t("Creates {folders} and a main.tex that compiles in Overleaf. Existing files are never "
+              "overwritten; data/ stays on this computer. With a link, the Overleaf project is cloned "
+              "first and the structure is only added if it has no .tex files yet.", folders=folders),
                                       color=MUTED)
         self._toggle_create()
 
-        self.label("Read-only files (the agent may read but never edit them)")
+        self.label(t("Read-only files (the agent may read but never edit them)"))
         ro_row = ctk.CTkFrame(self.body, fg_color="transparent")
         ro_row.grid(row=self._row, column=0, sticky="ew", pady=(0, 4))
         self._row += 1
-        self.read_only = ctk.CTkEntry(ro_row, placeholder_text="e.g. zotero.bib, refs/*.bib")
+        self.read_only = ctk.CTkEntry(ro_row, placeholder_text=t("e.g. zotero.bib, refs/*.bib"))
         self.read_only.pack(side="left", fill="x", expand=True)
         if spec and spec.read_only:
             self.read_only.insert(0, spec.read_only)
-        ctk.CTkButton(ro_row, text="Detect", width=70, command=self._detect).pack(side="left", padx=(4, 0))
+        ctk.CTkButton(ro_row, text=t("Detect"), width=70, command=self._detect).pack(side="left", padx=(4, 0))
         self.auto_protect = ctk.CTkCheckBox(
-            self.body, text="Also auto-protect Zotero / Mendeley / ReadCube .bib files")
+            self.body, text=t("Also auto-protect Zotero / Mendeley / ReadCube .bib files"))
         if spec is None or spec.auto_protect_bib:
             self.auto_protect.select()
         self.auto_protect.grid(row=self._row, column=0, sticky="w", pady=(0, 4))
         self._row += 1
-        self.label("Overleaf overwrites reference-manager .bib files when you click Refresh, so edits to "
-                   "them would be lost.", color=MUTED)
+        self.label(t("Overleaf overwrites reference-manager .bib files when you click Refresh, so edits to "
+                   "them would be lost."), color=MUTED)
         self.finish_layout("Save", self.submit)
 
     def _toggle_create(self) -> None:
@@ -433,12 +434,12 @@ class PaperDialog(_Dialog):
         folder = Path(self.path.get().strip() or default_local_path(self.papers_dir, self.name.get() or "paper"))
         found = detect_reference_manager_bibs(folder.expanduser())
         if not folder.expanduser().is_dir():
-            self.status.configure(text="Folder not cloned yet - save, sync the paper, then use Detect again.",
+            self.status.configure(text=t("Folder not cloned yet - save, sync the paper, then use Detect again."),
                                   text_color=MUTED)
             return
         if not found:
-            self.status.configure(text="No reference-manager .bib files detected. Add file names manually "
-                                       "if Overleaf shows a .bib as linked to Zotero/Mendeley.", text_color=MUTED)
+            self.status.configure(text=t("No reference-manager .bib files detected. Add file names manually "
+                                       "if Overleaf shows a .bib as linked to Zotero/Mendeley."), text_color=MUTED)
             return
         patterns = parse_patterns(self.read_only.get())
         patterns += [f for f in found if f not in patterns]
@@ -461,8 +462,8 @@ class PaperDialog(_Dialog):
         if bool(self.create.get()) and not self.editing:
             folder = Path(spec.local_path).expanduser()
             if looks_scaffolded(folder):
-                self.fail(f"{folder} already contains a paper (main.tex). Untick the structure box to use it "
-                          "as it is.")
+                self.fail(t("{folder} already contains a paper (main.tex). Untick the structure box to "
+                            "use it as it is.", folder=folder))
                 return
             layout = {"title": self.title_entry.get().strip() or spec.name}
         super().close(True)

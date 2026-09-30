@@ -23,6 +23,7 @@ from core.workflows import OrganizeWorkflow, PublishWorkflow
 from core.protection import ProtectionPolicy
 from gui.dialogs import PaperDialog, run_in_background
 from gui.panels import open_path
+from core.i18n import t
 
 NO_PAPER = "— add a paper —"
 
@@ -51,24 +52,26 @@ class PapersMixin:
             self.app_state.selected = current.name
             root = Path(current.local_path).expanduser()
             for name in ensure_local_folders(root):  # data/ and supplementary/ are created for every paper
-                self.panel.append(EventKind.INFO, f"Created {root / name} - it stays on this computer and is "
-                                                  "never sent to Overleaf.")
-            where = current.remote_url or "on this computer only"
+                self.panel.append(EventKind.INFO,
+                                  t("Created {folder} - it stays on this computer and is never sent to "
+                                    "Overleaf.", folder=root / name))
+            where = current.remote_url or t("on this computer only")
             policy = ProtectionPolicy.build(root, current.read_only, current.auto_protect_bib)
             locked = policy.protected_files()
             folders = present_folders(root)
             lines = [where, str(root)]
             if folders:
-                lines.append("Folders: " + ", ".join(f"{name}/" for name in folders))
+                lines.append(t("Folders: {names}", names=", ".join(f"{name}/" for name in folders)))
             if locked:
-                lines.append(f"Read-only: {', '.join(locked)}")
+                lines.append(t("Read-only: {files}", files=", ".join(locked)))
             unsorted = self._unsorted_files(root)
             if unsorted:
-                lines.append(f"{len(unsorted)} file(s) not in folders yet - File ▸ Organise paper into folders…")
+                lines.append(t("{count} file(s) not in folders yet - File ▸ Organise paper into folders…",
+                               count=len(unsorted)))
             self.paper_info.configure(text="\n".join(lines))
         else:
-            self.paper_info.configure(text="Create a new paper folder, or add the Overleaf/GitHub repository "
-                                           "of one you already have.")
+            self.paper_info.configure(text=t("Create a new paper folder, or add the Overleaf/GitHub repository "
+                                           "of one you already have."))
         self._refresh_sync_status()
         self.panel.set_sections([])
         self.todo.paper_changed()
@@ -97,7 +100,7 @@ class PapersMixin:
             self.app_state.upsert(new, old_name)
             self._save_state()
             self._refresh_papers()
-            self.panel.append(EventKind.SUCCESS, f"Paper '{new.name}' saved.")
+            self.panel.append(EventKind.SUCCESS, t("Paper '{name}' saved.", name=new.name))
             if old_name is None and new.remote_url:
                 # Clone first, so the local folder shares Overleaf's history and Sync can merge.
                 title = layout["title"] if layout is not None else None
@@ -112,8 +115,10 @@ class PapersMixin:
 
     def _remove_paper(self) -> None:
         spec = self.app_state.current
-        if spec and messagebox.askyesno("Remove paper", f"Remove '{spec.name}' from the list?\n\n"
-                                        "Files on disk are not deleted.", parent=self):
+        if spec and messagebox.askyesno(
+                t("Remove paper"),
+                t("Remove '{name}' from the list?\n\nFiles on disk are not deleted.", name=spec.name),
+                parent=self):
             self.app_state.remove(spec.name)
             self._save_state()
             self._refresh_papers()
@@ -121,25 +126,26 @@ class PapersMixin:
     def _open_paper_folder(self) -> None:
         root = self._paper_root()
         if root is None:
-            self.panel.append(EventKind.WARNING, "Add a paper first.")
+            self.panel.append(EventKind.WARNING, t("Add a paper first."))
         elif root.is_dir():
             open_path(root)
         else:
-            self.panel.append(EventKind.WARNING, f"{root} does not exist yet - refresh or sync the paper first.")
+            self.panel.append(EventKind.WARNING, t("{folder} does not exist yet - refresh or sync the paper first.", folder=root))
 
     def _sync_with_overleaf(self) -> None:
         """The Sync button: offer to add a link first if the paper is local only."""
         spec = self.app_state.current
         if spec is None:
-            self.panel.append(EventKind.WARNING, "Add a paper first.")
+            self.panel.append(EventKind.WARNING, t("Add a paper first."))
             return
         if spec.local_only:
-            self.panel.append(EventKind.INFO, f"'{spec.name}' is only on this computer - nothing is sent "
-                                              "anywhere until you link it to an Overleaf project.")
-            if messagebox.askyesno("No Overleaf link yet",
-                                   f"'{spec.name}' is saved on this computer only.\n\n"
-                                   "Add its Overleaf project link now? You can also keep working locally "
-                                   "and link it later.", parent=self):
+            self.panel.append(EventKind.INFO,
+                              t("'{name}' is only on this computer - nothing is sent anywhere until you "
+                                "link it to an Overleaf project.", name=spec.name))
+            if messagebox.askyesno(t("No Overleaf link yet"),
+                                   t("'{name}' is saved on this computer only.\n\nAdd its Overleaf "
+                                     "project link now? You can also keep working locally and link it "
+                                     "later.", name=spec.name), parent=self):
                 self._edit_paper()
             return
         self._start(PublishWorkflow, {})
@@ -149,22 +155,22 @@ class PapersMixin:
         spec = self.app_state.current
         root = self._paper_root()
         if spec is None or root is None or not root.is_dir():
-            self.panel.append(EventKind.WARNING, "Add and sync a paper first.")
+            self.panel.append(EventKind.WARNING, t("Add and sync a paper first."))
             return
         folders = ", ".join(f"{f.name}/" for f in FOLDERS)
         where = "Overleaf" if not spec.local_only else "this computer"
         if messagebox.askyesno(
-                "Organise into folders",
-                f"Sort the files of '{spec.name}' into {folders}?\n\n"
-                "The app shows you every move and every changed \\input / \\includegraphics path, and "
-                "compiles the result, before anything is written. Nothing moves until you approve.\n\n"
-                f"It becomes one commit on {where}.", parent=self):
+                t("Organise into folders"),
+                t("Sort the files of '{name}' into {folders}?\n\nThe app shows you every move and "
+                  "every changed \\input / \\includegraphics path, and compiles the result, before "
+                  "anything is written. Nothing moves until you approve.\n\nIt becomes one commit on "
+                  "{where}.", name=spec.name, folders=folders, where=where), parent=self):
             self._start(OrganizeWorkflow, {})
 
     def _sync_label(self, spec: PaperSpec | None) -> str:
         host = host_of(spec.remote_url) if spec else ""
         where = "Overleaf" if (not host or "overleaf" in host) else host
-        return f"⇄  Sync with {where}"
+        return t("⇄  Sync with {where}", where=where)
 
     def _refresh_sync_status(self) -> None:
         """Show how many commits are waiting to go to Overleaf (counted in the background)."""
@@ -176,9 +182,9 @@ class PapersMixin:
             return
         root = Path(spec.local_path).expanduser()
         if not (root / ".git").exists():
-            self.sync_status.configure(text="Not set up yet - press Refresh to clone or create the folder.")
+            self.sync_status.configure(text=t("Not set up yet - press Refresh to clone or create the folder."))
             return
-        self.sync_status.configure(text="Checking…")
+        self.sync_status.configure(text=t("Checking…"))
 
         def count() -> tuple[bool, int, int]:
             git = GitManager(root, spec.remote_url, spec.branch, self.config_.git)
@@ -188,14 +194,15 @@ class PapersMixin:
         def show(result: tuple[bool, int, int]) -> None:
             linked, ahead, behind = result
             if not linked:
-                text = ("Only on this computer" + (f" · {ahead} change(s) saved" if ahead else "")
-                        + " · add an Overleaf link with Edit paper to share it")
+                text = (t("Only on this computer")
+                        + (t(" · {n} change(s) saved", n=ahead) if ahead else "")
+                        + t(" · add an Overleaf link with Edit paper to share it"))
             elif ahead or behind:
-                parts = ([f"{ahead} change(s) to send"] if ahead else []) + \
-                        ([f"{behind} waiting from Overleaf"] if behind else [])
-                text = " · ".join(parts) + " (as of the last sync)"
+                parts = ([t("{n} change(s) to send", n=ahead)] if ahead else []) + \
+                        ([t("{n} waiting from Overleaf", n=behind)] if behind else [])
+                text = " · ".join(parts) + t(" (as of the last sync)")
             else:
-                text = "In sync with Overleaf as of the last sync"
+                text = t("In sync with Overleaf as of the last sync")
             self.sync_status.configure(text=text)
 
         run_in_background(self, count, show, lambda exc: self.sync_status.configure(text=""))
@@ -204,7 +211,7 @@ class PapersMixin:
         """Create the folder structure and a local repository for a brand-new paper."""
         root = Path(spec.local_path).expanduser()
         config = with_identity(self.config_, self.app_state.author_name, self.app_state.author_email)
-        self.panel.append(EventKind.INFO, f"Setting up {root}…")
+        self.panel.append(EventKind.INFO, t("Setting up {folder}…", folder=root))
 
         def work() -> list[str]:
             created = scaffold(root, title, config.git.author_name)
@@ -223,7 +230,7 @@ class PapersMixin:
             self.recompile_preview(quiet=True)
 
         run_in_background(self, work, done, lambda exc: self.panel.append(
-            EventKind.ERROR, f"Could not set up the paper folder: {exc}"))
+            EventKind.ERROR, t("Could not set up the paper folder: {problem}", problem=exc)))
 
     def _clone_new_paper(self, spec: PaperSpec, title: str | None) -> None:
         """Clone a newly added linked paper; add the folder structure only if the project has no .tex yet."""
@@ -231,7 +238,7 @@ class PapersMixin:
         host, _ = self._paper_host(spec)
         credential = self._safe(lambda: self.store.get_git(host)) if host else None
         config = with_identity(self.config_, self.app_state.author_name, self.app_state.author_email)
-        self.panel.append(EventKind.INFO, f"Cloning {spec.remote_url} into {root}…")
+        self.panel.append(EventKind.INFO, t("Cloning {url} into {folder}…", url=spec.remote_url, folder=root))
 
         def work() -> tuple[list[str], bool]:
             git = GitManager(root, spec.remote_url, spec.branch, config.git, credential=credential,
@@ -247,21 +254,22 @@ class PapersMixin:
 
         def done(result: tuple[list[str], bool]) -> None:
             created, has_tex = result
-            self.panel.append(EventKind.SUCCESS, f"Cloned '{spec.name}' into {root}.")
+            self.panel.append(EventKind.SUCCESS, t("Cloned '{name}' into {folder}.", name=spec.name, folder=root))
             if created:
-                self.panel.append(EventKind.SUCCESS, f"The Overleaf project was empty, so the folder structure "
-                                                     f"was added ({len(created)} file(s)). Press Sync to send it.")
+                self.panel.append(EventKind.SUCCESS,
+                                  t("The Overleaf project was empty, so the folder structure was added "
+                                    "({count} file(s)). Press Sync to send it.", count=len(created)))
             elif title is not None and has_tex:
-                self.panel.append(EventKind.INFO, "The Overleaf project already has a paper, so its files were "
-                                                  "left as they are.")
+                self.panel.append(EventKind.INFO, t("The Overleaf project already has a paper, so its files were "
+                                                  "left as they are."))
             if self._unsorted_files(root):
-                self.panel.append(EventKind.INFO, "To sort its files into folders, use "
-                                                  "File ▸ Organise paper into folders…")
+                self.panel.append(EventKind.INFO, t("To sort its files into folders, use "
+                                                  "File ▸ Organise paper into folders…"))
             self._refresh_papers()
             self.recompile_preview(quiet=True)
 
         run_in_background(self, work, done, lambda exc: self.panel.append(
-            EventKind.ERROR, f"Could not clone the paper: {exc}"))
+            EventKind.ERROR, t("Could not clone the paper: {problem}", problem=exc)))
 
     @staticmethod
     def _unsorted_files(root: Path) -> list[str]:
@@ -272,14 +280,14 @@ class PapersMixin:
     def _load_sections(self) -> list[str]:
         spec = self.app_state.current
         if spec is None:
-            self.panel.append(EventKind.ERROR, "Add a paper first.")
+            self.panel.append(EventKind.ERROR, t("Add a paper first."))
             return []
         root = Path(spec.local_path).expanduser()
         if not root.is_dir():
-            self.panel.append(EventKind.WARNING, "The paper is not cloned yet - click 'Sync paper' first.")
+            self.panel.append(EventKind.WARNING, t("The paper is not cloned yet - click 'Sync paper' first."))
             return []
         titles = list_section_titles(root)
-        self.panel.append(EventKind.INFO, f"Loaded {len(titles)} section titles.")
+        self.panel.append(EventKind.INFO, t("Loaded {count} section titles.", count=len(titles)))
         return titles
 
     def _list_bibs(self) -> list[str]:
@@ -287,12 +295,13 @@ class PapersMixin:
         spec = self.app_state.current
         root = Path(spec.local_path).expanduser() if spec else None
         if root is None or not root.is_dir():
-            self.panel.append(EventKind.WARNING, "The paper is not cloned yet - click 'Sync paper' first.")
+            self.panel.append(EventKind.WARNING, t("The paper is not cloned yet - click 'Sync paper' first."))
             return []
         policy = ProtectionPolicy.build(root, spec.read_only, spec.auto_protect_bib)
         bibs = sorted(p.relative_to(root).as_posix() for p in root.rglob("*.bib") if ".git" not in p.parts)
         editable = [b for b in bibs if policy.reason(b) is None]
         if len(editable) < len(bibs):
-            self.panel.append(EventKind.INFO, f"Read-only .bib files not listed: "
-                                              f"{', '.join(b for b in bibs if b not in editable)}")
+            self.panel.append(EventKind.INFO,
+                              t("Read-only .bib files not listed: {files}",
+                                files=", ".join(b for b in bibs if b not in editable)))
         return editable

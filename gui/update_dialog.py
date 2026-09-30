@@ -18,6 +18,7 @@ from core.dependencies import tools_dir
 from core.updater import Release, UpdateError, check, launch_swap, running_app_dir, stage
 from gui.dialogs import MUTED, OK, _Dialog, run_in_background
 from version import UPDATE_REPO, __version__
+from core.i18n import t
 
 logger = logging.getLogger("research_agent")
 UPDATING = "Updating, app will restart after update"
@@ -48,7 +49,7 @@ class UpdateDialog(_Dialog):
             self.finish_layout("Update now", self.start)
         for child in self.buttons.winfo_children():
             if isinstance(child, ctk.CTkButton) and child.cget("text") == "Cancel":
-                child.configure(text="Later")
+                child.configure(text=t("Later"))
         self._progress = (0, 0)
         self._running = False
 
@@ -61,7 +62,7 @@ class UpdateDialog(_Dialog):
             return
         self._running = True
         logger.info("Update %s: 'Update now' pressed", self.release.version)
-        self.busy(f"{UPDATING}\nStarting the download…")
+        self.busy(t("{updating}\nStarting the download…", updating=t(UPDATING)))
         self.bar.set(0)
         run_in_background(self, lambda: stage(self.release, self.app_dir, progress=self._on_progress),
                           self._staged, self._failed)
@@ -85,7 +86,7 @@ class UpdateDialog(_Dialog):
             self.after(100, self._poll)
 
     def _say(self, step: str, color: str = MUTED) -> None:
-        self.status.configure(text=f"{UPDATING}\n{step}", text_color=color)
+        self.status.configure(text=t("{updating}\n{step}", updating=t(UPDATING), step=step), text_color=color)
 
     def _staged(self, staged: Any) -> None:
         self._running = False
@@ -98,7 +99,7 @@ class UpdateDialog(_Dialog):
 
     def _failed(self, exc: Exception) -> None:
         self._running = False
-        self.fail(f"The update could not be installed: {exc}")
+        self.fail(t("The update could not be installed: {problem}", problem=exc))
 
     def cancel(self) -> None:
         if not self._running:
@@ -119,7 +120,7 @@ class UpdateMixin:
                 UpdateDialog(self, release, on_done=lambda _ok: then() if then else None)
                 return
             if verbose:
-                messagebox.showinfo("Updates", f"You have the latest version ({__version__}).", parent=self)
+                messagebox.showinfo("Updates", t("You have the latest version ({version}).", version=__version__), parent=self)
             if then:
                 then()
 
@@ -146,7 +147,7 @@ class UpdateMixin:
         try:
             launch()
         except (OSError, UpdateError) as exc:
-            messagebox.showerror("Update", f"Could not start the update: {exc}", parent=self)
+            messagebox.showerror(t("Update"), t("Could not start the update: {problem}", problem=exc), parent=self)
             return False
         self._save_state()
         if self.cancel_token:

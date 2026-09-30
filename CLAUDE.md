@@ -71,6 +71,15 @@ python -m venv .venv
   It is the third setting of the middle switch. Each task may *name* a paper; that is only a label. Keep
   `TodoStore` repository-agnostic. `migrate_paper_lists` moves an old per-paper `todo.md` in and deletes it
   from the paper, committing locally so Sync still decides when Overleaf sees it; it is idempotent by task id.
+- **The interface translates; a paper never does.** `core/i18n.py` (`t()`, English text is the key) plus
+  `core/lang/de_*.py`; the language is `AppState.language` and applies at the next start. Modules that write
+  into a paper — `project_layout`, `reorganize`, `figures`, `results_latex`, `latex_parser`, `latex_safety`,
+  `prompts` — must never import `core.i18n`; `tests/test_i18n.py` fails if they do, and separately scaffolds
+  a paper in German and compares it byte for byte with the English one. Commit messages, saved reports and
+  the agent's own step-by-step log also stay English (asked for on 2026-09-30). Text that is also an
+  identifier (workflow names, the middle switch, the to-do filters) goes through `i18n.Choices`, which shows
+  a translation but returns the English value. `test_every_translated_string_has_german` lists any `t("…")`
+  with no German.
 - **Files stay under 500 lines**; split into mixins/modules (see `gui/*_mixin.py`, `gui/pdf_links.py`).
 
 ## Pitfalls that cost time before
