@@ -31,6 +31,8 @@ DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 APP = "ResearchAssistant"
 GUIDE = ROOT / "docs" / "USER_GUIDE.md"
+GUIDE_DE = ROOT / "docs" / "INSTALLATION_DE.md"   # the German setup guide
+GUIDES = (GUIDE, GUIDE_DE)
 # Never shipped in the source zip: local settings/secrets, environments, caches, build output.
 SOURCE_EXCLUDE_DIRS = {".venv", "venv", "__pycache__", ".pytest_cache", "build", "dist", ".git", ".claude",
                        ".claude-flow", ".swarm", ".hive-mind"}
@@ -47,6 +49,8 @@ FIRST_STEPS = """Research Assistant - first steps
 3. Sign in with YOUR OWN Claude API key and Overleaf Git token when the app asks.
 
 The full guide is USER_GUIDE.md in this folder (also Help > User guide in the app).
+Auf Deutsch: INSTALLATION_DE.md fuehrt Schritt fuer Schritt durch die Einrichtung
+(Sprache umstellen mit Language > Deutsch).
 Keep this whole folder together - the .exe needs the _internal folder next to it.
 """
 
@@ -87,12 +91,14 @@ def build_app(icon: Path) -> Path:
         "--hidden-import", "keyring.backends.Windows",
         "--hidden-import", "win32ctypes.core",
         "--hidden-import", "openpyxl",          # imported lazily when a .xlsx of results is read
-        "--add-data", f"{GUIDE}{';' if sys.platform == 'win32' else ':'}docs",
+        *[arg for guide in GUIDES
+          for arg in ("--add-data", f"{guide}{';' if sys.platform == 'win32' else ':'}docs")],
         "--exclude-module", "pytest",
         "--exclude-module", "tests",
     ])
     folder = DIST / APP
-    shutil.copy2(GUIDE, folder / GUIDE.name)
+    for guide in GUIDES:
+        shutil.copy2(guide, folder / guide.name)
     (folder / "READ ME FIRST.txt").write_text(FIRST_STEPS, encoding="utf-8")
     return folder
 

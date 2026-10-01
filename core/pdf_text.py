@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from core.user_errors import UserMessage
 
 MAX_CHARS = 60_000        # about 15k tokens: a long paper, without an alarming bill
 MAX_FILE_MB = 50
@@ -20,7 +21,7 @@ DOI_RE = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b")
 TRAILING_PUNCTUATION = ".,;:)]}>"
 
 
-class PdfTextError(ValueError):
+class PdfTextError(UserMessage, ValueError):
     """A PDF cannot be read (missing, too large, or no text layer)."""
 
 
@@ -55,12 +56,14 @@ def read_pdf(path: Path) -> PdfText:
     """
     path = Path(path)
     if not path.is_file():
-        raise PdfTextError(f"{path} is not a file.")
+        raise PdfTextError("{file} is not a file.", file=path)
     if path.suffix.lower() != ".pdf":
-        raise PdfTextError(f"{path.name}: only PDF files can be summarised from your computer.")
+        raise PdfTextError("{name}: only PDF files can be summarised from your computer.",
+                           name=path.name)
     size_mb = path.stat().st_size / 1_000_000
     if size_mb > MAX_FILE_MB:
-        raise PdfTextError(f"{path.name} is {size_mb:.0f} MB - too large to read (limit {MAX_FILE_MB} MB).")
+        raise PdfTextError("{name} is {size} MB - too large to read (limit {limit} MB).",
+                           name=path.name, size=f"{size_mb:.0f}", limit=MAX_FILE_MB)
 
     try:
         import pypdfium2 as pdfium
@@ -81,13 +84,14 @@ def read_pdf(path: Path) -> PdfText:
     except PdfTextError:
         raise
     except Exception as exc:        # noqa: BLE001 - PDFium raises its own types
-        raise PdfTextError(f"{path.name} could not be read: {exc}") from exc
+        raise PdfTextError("{name} could not be read: {problem}", name=path.name, problem=exc) from exc
 
     text = _tidy("\n".join(parts))
     if len(text) < MIN_USEFUL_CHARS:
         raise PdfTextError(
-            f"{path.name} has almost no text to read ({len(text)} characters). It is probably a scan of "
-            "the printed pages; a PDF with real text is needed, or use the paper's DOI instead.")
+            "{name} has almost no text to read ({count} characters). It is probably a scan of the "
+            "printed pages; a PDF with real text is needed, or use the paper's DOI instead.",
+            name=path.name, count=len(text))
     return PdfText(path=path, text=text[:MAX_CHARS], pages=pages, truncated=total > MAX_CHARS)
 
 

@@ -115,7 +115,9 @@ class ResultsFigureWorkflow(BaseWorkflow):
             try:
                 table = tables[int(re.sub(r"\D", "", chosen) or 1) - 1]
             except (ValueError, IndexError):
-                raise LatexIntegrityError([f"table must be one of 1-{len(tables)} (got {chosen!r})."]) from None
+                # Read by the model, which repairs its plan, so it stays English like the prompts.
+                raise LatexIntegrityError(
+                    [f"table must be one of 1-{len(tables)} (got {chosen!r})."]) from None
             caption = user_caption or extract_tagged(response, "caption") or ""
             if not caption:
                 problems.append("Missing <caption>...</caption>.")
@@ -202,7 +204,7 @@ class ResultsFigureWorkflow(BaseWorkflow):
         try:
             body = build(table, spec)
         except ResultsError as exc:
-            raise AgentError(f"The chart could not be drawn: {exc}") from exc
+            raise AgentError("The chart could not be drawn: {problem}", problem=exc) from exc
         block = float_block(body, spec.caption or PLACEHOLDER_CAPTION, label, spec.kind,
                             self.params.get("placement") or "htbp")
         new_tex = insert_at_section_end(tex, section.title, f"{sentence}\n\n{block}" if sentence else block)

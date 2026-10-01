@@ -15,6 +15,7 @@ import re
 from pathlib import Path, PurePosixPath
 
 from core.latex_parser import comment_mask, split_sections, strip_comments
+from core.user_errors import UserMessage
 
 INCLUDABLE = {".png", ".jpg", ".jpeg", ".pdf"}
 CONVERTIBLE = {".tif", ".tiff", ".bmp", ".gif", ".webp"}
@@ -31,22 +32,25 @@ _GRAPHICX_RE = re.compile(r"\\usepackage(?:\[[^\]]*\])?\{[^}]*\bgraphicx?\b[^}]*
 _LABEL_RE = re.compile(r"\\label\{([^}]*)\}")
 
 
-class FigureError(ValueError):
+class FigureError(UserMessage, ValueError):
     """An image cannot be added (unsupported, too large, missing)."""
 
 
 def check_image(path: Path) -> list[str]:
     """Validate a user-selected image. Returns warnings; raises on hard errors."""
     if not path.is_file():
-        raise FigureError(f"File not found: {path}")
+        raise FigureError("File not found: {file}", file=path)
     suffix = path.suffix.lower()
     if suffix in NEEDS_EXPORT:
-        raise FigureError(f"{path.name}: {suffix} files cannot be included directly. {NEEDS_EXPORT[suffix]}")
+        raise FigureError("{name}: {suffix} files cannot be included directly. {hint}",
+                          name=path.name, suffix=suffix, hint=NEEDS_EXPORT[suffix])
     if suffix not in INCLUDABLE | CONVERTIBLE:
-        raise FigureError(f"{path.name}: unsupported image type {suffix or '(none)'} - use PNG, JPG or PDF.")
+        raise FigureError("{name}: unsupported image type {suffix} - use PNG, JPG or PDF.",
+                          name=path.name, suffix=suffix or "(none)")
     size_mb = path.stat().st_size / 1_048_576
     if size_mb > MAX_FILE_MB:
-        raise FigureError(f"{path.name} is {size_mb:.0f} MB - Overleaf accepts files up to {MAX_FILE_MB} MB.")
+        raise FigureError("{name} is {size} MB - Overleaf accepts files up to {limit} MB.",
+                          name=path.name, size=f"{size_mb:.0f}", limit=MAX_FILE_MB)
     warnings = []
     if size_mb > WARN_FILE_MB:
         warnings.append(f"{path.name} is {size_mb:.0f} MB; consider compressing it to keep the project fast.")
@@ -95,7 +99,7 @@ def unique_rel_path(root: Path, folder: str, stem: str, suffix: str, taken: set[
         if rel not in taken and not (root / rel).exists():
             taken.add(rel)
             return rel
-    raise FigureError(f"Could not find a free file name for {stem}{suffix}")
+    raise FigureError("Could not find a free file name for {name}", name=f"{stem}{suffix}")
 
 
 def unique_label(stem: str, tex_sources: list[str], taken: set[str]) -> str:
@@ -159,7 +163,8 @@ def _add_to_preamble(main_source: str, block: str, name: str) -> str:
     if anchor is None:
         doc = re.search(r"\\documentclass(?:\[[^\]]*\])?\{[^}]*\}[^\n]*\n", main_source)
         if doc is None:
-            raise FigureError(f"Could not find the preamble to add \\usepackage{{{name}}}.")
+            raise FigureError("Could not find the preamble to add \\usepackage for {package}.",
+                              package=name)
         anchor = doc.end()
     return main_source[:anchor] + block + main_source[anchor:]
 
@@ -169,7 +174,7 @@ def section_text_end(tex: str, title: str) -> int:
     sections = split_sections(tex)
     target = next((s for s in sections if s.title == title), None)
     if target is None:
-        raise FigureError(f"Section {title!r} not found")
+        raise FigureError("Section '{section}' not found", section=title)
     children = [s.start for s in sections if target.start < s.start < target.end]
     return min(children) if children else target.end
 

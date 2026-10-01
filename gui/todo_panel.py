@@ -18,7 +18,7 @@ import customtkinter as ctk
 from core.events import EventKind
 from core.todos import TodoDoc, TodoError, TodoItem, TodoStore, op_add, op_delete, op_update
 from gui.dialogs import _Dialog, run_in_background
-from core.i18n import Choices, t
+from core.i18n import Choices, t, translated
 
 MUTED, OVERDUE, DONE = "#8b949e", "#f85149", "#3fb950"
 FILTERS = ("Open", "Mine", "Overdue", "Done", "All")
@@ -47,7 +47,8 @@ class TodoEditDialog(_Dialog):
 
     def __init__(self, master: Any, item: TodoItem, people: list[str], sections: list[str],
                  papers: list[str], on_save: Callable[[dict[str, Any]], None]) -> None:
-        super().__init__(master, "Edit task", "Edit task", f"Created by {item.by or 'unknown'} on {item.created}.")
+        super().__init__(master, "Edit task", "Edit task",
+                         t("Created by {who} on {when}.", who=item.by or t("unknown"), when=item.created))
         self.on_save = on_save
         self.text = self.entry(t("Task"), item.text)
         self.label(t("Assigned to"))
@@ -55,7 +56,7 @@ class TodoEditDialog(_Dialog):
         self.assignee.set(item.assignee)
         self.assignee.grid(row=self._row, column=0, sticky="ew", pady=(0, 10))
         self._row += 1
-        self.due = self.entry(t("Due date (YYYY-MM-DD)"), item.due, placeholder="optional")
+        self.due = self.entry(t("Due date (YYYY-MM-DD)"), item.due, placeholder=t("optional"))
         self.label(t("Paper"))
         self.paper = ctk.CTkComboBox(self.body, values=[""] + papers, width=460)
         self.paper.set(item.paper)
@@ -170,9 +171,9 @@ class TodoPanel(ctk.CTkFrame):
         try:
             store = self.ctx.make_store()
         except TodoError as exc:
-            self.status.configure(text=str(exc))
+            self.status.configure(text=translated(exc))
             if not quiet:
-                self.ctx.notify(EventKind.WARNING, str(exc))
+                self.ctx.notify(EventKind.WARNING, translated(exc))
             return
         self.me = store.author
         self._set_busy(True, "Syncing…")
@@ -193,9 +194,10 @@ class TodoPanel(ctk.CTkFrame):
         def failed(exc: Exception) -> None:
             self.render()  # undo an optimistic checkbox tick
             if quiet:  # background refresh: never pop up dialogs
-                self._set_busy(False, f"Not synced: {str(exc).splitlines()[0][:100]}")
+                self._set_busy(False, t("Not synced: {problem}",
+                                        problem=translated(exc).splitlines()[0][:100]))
                 return
-            self._set_busy(False, "Failed - see the Live Log.")
+            self._set_busy(False, t("Failed - see the Live Log."))
             self.ctx.handle_error(exc)
 
         run_in_background(self, job, ok, failed)

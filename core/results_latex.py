@@ -117,7 +117,7 @@ def _pairs(table: ResultTable, spec: ChartSpec, column: str, symbolic: bool) -> 
             continue
         out.append(f"({escape(x) if symbolic else f'{x:g}'},{y:g})")
     if not out:
-        raise ResultsError(f"Column {column!r} has no numeric values to plot.")
+        raise ResultsError("Column '{column}' has no numeric values to plot.", column=column)
     return " ".join(out)
 
 
@@ -172,17 +172,19 @@ def confusion_matrix(table: ResultTable, spec: ChartSpec) -> str:
     classes = [escape(v) for v in table.values(spec.x)]
     size = len(spec.series)
     if len(classes) != size:
-        raise ResultsError(f"A confusion matrix needs as many rows as plotted columns "
-                           f"({len(classes)} rows, {size} columns).")
+        raise ResultsError("A confusion matrix needs as many rows as plotted columns "
+                           "({rows} rows, {columns} columns).", rows=len(classes), columns=size)
     if size > MAX_MATRIX_CLASSES:
-        raise ResultsError(f"{size} classes do not fit in a readable matrix "
-                           f"(limit {MAX_MATRIX_CLASSES}); plot a table instead.")
+        raise ResultsError("{count} classes do not fit in a readable matrix "
+                           "(limit {limit}); plot a table instead.",
+                           count=size, limit=MAX_MATRIX_CLASSES)
     points = []
     for row_at in range(size):
         for col_at, column in enumerate(spec.series):
             value = table.values(column)[row_at]
             if not isinstance(value, (int, float)):
-                raise ResultsError(f"The matrix cell in row {row_at + 1}, column {column!r} is not a number.")
+                raise ResultsError("The matrix cell in row {row}, column '{column}' is not a number.",
+                                   row=row_at + 1, column=column)
             points.append(f"({col_at},{size - 1 - row_at}) [{value:g}]")
     ticks = ",".join(str(i) for i in range(size))
     options = [f"width={spec.width}", f"height={spec.width}",     # square cells

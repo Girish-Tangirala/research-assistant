@@ -47,7 +47,7 @@ def open_store(workspace: Path, settings: TodoRepoSettings, author: str,
                         "Options ▸ Shared to-do list… and paste the repository link.")
     host = host_of(settings.url)
     if host and credential is None:
-        raise TodoError(f"Sign in to {host} (Accounts menu) to use the shared to-do list.")
+        raise TodoError("Sign in to {host} (Accounts menu) to use the shared to-do list.", host=host)
     git = GitManager(clone_path(workspace), settings.url, settings.branch, git_settings,
                      credential=credential, log=_quiet(log))
     # Always push: this repository holds nothing but the list, so there is no

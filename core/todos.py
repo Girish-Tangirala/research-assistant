@@ -25,6 +25,7 @@ from datetime import date
 
 from core.git_manager import GitManager, GitOperationError
 from core.protection import SHARED_TODO_FILE as TODO_FILE
+from core.user_errors import UserMessage
 HEADER = ("# To-do list\n\n"
           "<!-- Shared by the Research Assistant Agent app. One task per line: you can tick [x] or edit the task "
           "text here in the browser; the app keeps the details in the comment at the end of each line. -->\n")
@@ -35,7 +36,7 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SEPARATOR = " — "
 
 
-class TodoError(RuntimeError):
+class TodoError(UserMessage, RuntimeError):
     """A to-do operation failed (message is user-facing)."""
 
 
@@ -46,7 +47,7 @@ def _clean(text: str) -> str:
 def validate_due(value: str) -> str:
     value = (value or "").strip()
     if value and (not _DATE_RE.match(value) or not _is_date(value)):
-        raise TodoError(f"Due date must look like 2026-10-01, got {value!r}.")
+        raise TodoError("Due date must look like 2026-10-01, got '{value}'.", value=value)
     return value
 
 

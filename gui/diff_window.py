@@ -29,7 +29,7 @@ class DiffWindow(ctk.CTkToplevel):
         super().__init__(master)
         self._on_decision = on_decision
         self._decided = False
-        self.title(f"Review change – {change.rel_path}")
+        self.title(t("Review change – {file}", file=change.rel_path))
         self.geometry("900x720")
         self.minsize(700, 400)
         self.protocol("WM_DELETE_WINDOW", lambda: self._decide(False))

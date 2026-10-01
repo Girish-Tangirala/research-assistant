@@ -235,3 +235,104 @@ def test_full_screen_can_be_turned_on_and_off(app):
     app.update()
     assert app.fullscreen_var.get() is True
     app.set_fullscreen(False)      # leave the test window usable
+
+
+# ---------------------------------------------------------------------- #
+# A dialog's own chrome: _Dialog translates the title, heading, intro text and
+# primary button it is handed. Nothing looked those up before v1.5.2, so the
+# first-start setup window and every sign-in window stayed English in a German
+# app. A catalogue entry alone proves nothing here - the window is built and
+# read back, the way the dead Run button taught us.
+# ---------------------------------------------------------------------- #
+def dialog_texts(dialog) -> str:
+    """Everything the dialog shows: its title, its labels and its buttons."""
+    parts = [dialog.title()]
+    for frame in (dialog.body, dialog.buttons):
+        for child in frame.winfo_children():
+            try:
+                text = child.cget("text")
+            except Exception:                       # a progress bar or an entry
+                continue
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts)
+
+
+@pytest.mark.parametrize("build, expected", [
+    (lambda app: __import__("gui.setup_dialog", fromlist=["SetupDialog"]).SetupDialog(
+        app, ["git", "miktex"], lambda ok: None),
+     ["Forschungsassistent einrichten", "Hilfsprogramme", "Jetzt installieren", "Abbrechen"]),
+    (lambda app: __import__("gui.dialogs", fromlist=["ClaudeLoginDialog"]).ClaudeLoginDialog(
+        app, FakeStore(), "claude-opus-5", lambda ok: None),
+     ["Bei Claude anmelden", "API-Schlüssel", "Anmelden"]),
+    (lambda app: __import__("gui.dialogs", fromlist=["GitLoginDialog"]).GitLoginDialog(
+        app, FakeStore(), "git.overleaf.com", "", "Tester", "t@test.org", lambda *a: None),
+     ["Bei git.overleaf.com anmelden", "Zugriffstoken", "Benutzername", "Anmelden"]),
+    (lambda app: __import__("gui.dialogs", fromlist=["PaperDialog"]).PaperDialog(
+        app, None, set(), app.config_.papers_dir, lambda *a: None),
+     ["Paper hinzufügen", "Name des Papers", "Speichern", "Abbrechen"]),
+    (lambda app: __import__("gui.todo_setup", fromlist=["TodoRepoDialog"]).TodoRepoDialog(
+        app, __import__("core.app_state", fromlist=["TodoRepoSettings"]).TodoRepoSettings(),
+        lambda s: None),
+     ["Gemeinsame To-do-Liste", "Link zum Repository", "Speichern"]),
+])
+def test_a_dialog_is_german_all_the_way_through(app, build, expected):
+    from core.i18n import set_language
+
+    set_language("de")
+    try:
+        dialog = build(app)
+        app.update()
+        shown = dialog_texts(dialog)
+        try:
+            for phrase in expected:
+                assert phrase in shown, f"not translated: {phrase!r}\nthe dialog showed:\n{shown}"
+            assert "Sign in" not in shown and "Install now" not in shown, \
+                f"English left in a German dialog:\n{shown}"
+        finally:
+            dialog.destroy()
+    finally:
+        set_language("en")
+
+
+def test_the_discard_button_of_the_push_dialog_is_renamed_in_german(app):
+    """It was found by its English label, so in German it stayed 'Abbrechen'."""
+    from core.i18n import set_language
+    from gui.preview_pane import PushConfirmDialog
+
+    set_language("de")
+    try:
+        dialog = PushConfirmDialog(app, "2 Dateien", ["main.tex"], lambda ok: None,
+                                   button="Push", cancel="Discard")
+        app.update()
+        try:
+            assert dialog.cancel_button.cget("text") == "Verwerfen", \
+                f"the Discard button reads {dialog.cancel_button.cget('text')!r}"
+        finally:
+            dialog.destroy()
+    finally:
+        set_language("en")
+
+
+def test_the_accounts_menu_is_german(app):
+    """Its statuses and actions were English although de_status.py held the German.
+
+    They are built in gui/accounts.py as f-strings and rendered in gui/menubar.py as
+    data, so no t() sat at either end and no audit of t() calls could see them.
+    """
+    from core.i18n import set_language
+
+    set_language("de")
+    try:
+        lines = []
+        for section in app._account_sections():                   # noqa: SLF001
+            lines.append(section.status)
+            lines += [label for label, _cmd, _on in section.actions]
+        shown = "\n".join(lines)
+        for phrase in ("Claude: nicht angemeldet", "Anmelden…", "Abmelden",
+                       "OpenAlex-Schlüssel", "Datensicherung:"):
+            assert phrase in shown, f"not translated: {phrase!r}\nthe menu showed:\n{shown}"
+        for english in ("Sign in", "Sign out", "not signed in", "Data backup"):
+            assert english not in shown, f"English left in the Accounts menu: {english!r}\n{shown}"
+    finally:
+        set_language("en")

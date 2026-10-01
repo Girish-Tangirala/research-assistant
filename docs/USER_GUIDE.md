@@ -182,6 +182,10 @@ shared list…** once: it copies those tasks over with their assignee, due date 
 The **Language** menu at the top switches the app between English and Deutsch. The app asks whether to
 restart, because the labels are set when the window opens.
 
+**Auf Deutsch:** `INSTALLATION_DE.md` in this folder is a German step-by-step setup guide for a new
+computer, from the GitHub release page to the first PDF. With the interface in German, **Help → User
+guide** opens that one instead of this file.
+
 Only the buttons and messages change language. **Your paper is always written in English** - the folder
 structure, the LaTeX, the captions and everything the assistant writes for you. That is deliberate: you
 publish in English, and a German word must never slip into a manuscript.

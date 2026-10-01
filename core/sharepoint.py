@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from core.user_errors import UserMessage
 
 AUTHORITY = "https://login.microsoftonline.com"
 GRAPH = "https://graph.microsoft.com/v1.0"
@@ -37,7 +38,7 @@ TIMEOUT = 60.0
 DEFAULT_TENANT = "organizations"           # work/school accounts; a tenant id also works
 
 
-class SharePointError(RuntimeError):
+class SharePointError(UserMessage, RuntimeError):
     """A SharePoint operation failed, with a user-facing explanation."""
 
 

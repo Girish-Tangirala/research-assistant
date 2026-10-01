@@ -18,6 +18,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from core.user_errors import UserMessage
 
 
 class EventKind(str, Enum):
@@ -144,7 +145,7 @@ class ProposedChange:
         return self.source_file is None and self.original == self.proposed
 
 
-class CancelledError(RuntimeError):
+class CancelledError(UserMessage, RuntimeError):
     """Raised inside the worker when the user presses Cancel."""
 
 

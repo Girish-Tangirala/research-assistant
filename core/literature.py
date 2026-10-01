@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from core.latex_parser import BibEntry
+from core.user_errors import UserMessage
 
 Fetcher = Callable[[str], bytes]
 OPENALEX = "https://api.openalex.org/works"
@@ -35,7 +36,7 @@ URL_IN_TEXT_RE = re.compile(r"https?://[^\s\"<>|)\]]+")
 ARXIV_ID_RE = re.compile(r"(?:arxiv[:/ ]|abs/)?(\d{4}\.\d{4,5})(v\d+)?", re.I)
 
 
-class LiteratureError(RuntimeError):
+class LiteratureError(UserMessage, RuntimeError):
     """A scholarly search request failed."""
 
 
@@ -130,18 +131,21 @@ class ScholarlySearch:
             host = urllib.parse.urlparse(url).hostname
             if exc.code == 429:
                 extra = " Add a free OpenAlex API key under Accounts to raise the limit." if "openalex" in (host or "") else ""
-                raise LiteratureError(f"{host} rate limit or daily budget reached (HTTP 429).{extra}") from exc
+                raise LiteratureError("{host} rate limit or daily budget reached (HTTP 429).{extra}",
+                                      host=host, extra=extra) from exc
             if exc.code == 404:
-                raise LiteratureError(f"Not found at {host}.") from exc
-            raise LiteratureError(f"{host} returned HTTP {exc.code}.") from exc
+                raise LiteratureError("Not found at {host}.", host=host) from exc
+            raise LiteratureError("{host} returned HTTP {status}.", host=host, status=exc.code) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
-            raise LiteratureError(f"Network error contacting {urllib.parse.urlparse(url).hostname}: {exc}") from exc
+            raise LiteratureError("Network error contacting {host}: {problem}",
+                                  host=urllib.parse.urlparse(url).hostname, problem=exc) from exc
 
     def _json(self, url: str) -> dict[str, Any]:
         try:
             return json.loads(self._fetch(url))
         except ValueError as exc:
-            raise LiteratureError(f"Unexpected response from {urllib.parse.urlparse(url).hostname}") from exc
+            raise LiteratureError("Unexpected response from {host}",
+                                  host=urllib.parse.urlparse(url).hostname) from exc
 
     def _register(self, records: Iterable[PaperRecord]) -> list[PaperRecord]:
         out = []
@@ -267,7 +271,8 @@ class ScholarlySearch:
         limit = max(1, min(int(limit), 25))
         handlers = {"openalex": self.search_openalex, "crossref": self.search_crossref, "arxiv": self.search_arxiv}
         if source not in handlers:
-            raise LiteratureError(f"Unknown source {source!r}; use one of {sorted(handlers)}.")
+            raise LiteratureError("Unknown source '{source}'; use one of {known}.",
+                                  source=source, known=sorted(handlers))
         return self._register(handlers[source](query.strip(), limit, year_from, year_to))
 
     def details(self, identifier: str) -> PaperRecord:
@@ -289,7 +294,8 @@ class ScholarlySearch:
             records = self._arxiv_get({"id_list": arxiv.group(1)})
             if records:
                 return self._register(records)[0]
-        raise LiteratureError(f"Could not resolve {identifier!r} (expected a DOI, arXiv id or OpenAlex id).")
+        raise LiteratureError("Could not resolve '{identifier}' (expected a DOI, arXiv id or OpenAlex id).",
+                              identifier=identifier)
 
 
 # ---------------------------------------------------------------------- #

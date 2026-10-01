@@ -42,6 +42,7 @@ from core.llm_client import LLMClient, text_of
 from core.preview import PreviewBuilder
 from core.prompts import AGENT_SYSTEM_PROMPT
 from core.tool_schemas import TOOL_SCHEMAS
+from core.user_errors import UserMessage
 
 MAX_TOOL_OUTPUT_CHARS = 300_000
 WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": 8}
@@ -66,7 +67,7 @@ class WorkflowState(str, Enum):
     CANCELLED = "Cancelled"
 
 
-class AgentError(RuntimeError):
+class AgentError(UserMessage, RuntimeError):
     """Unrecoverable engine failure."""
 
 
@@ -155,7 +156,7 @@ class AgentEngine:
         if staged is not None:
             return staged.proposed
         if not path.is_file():
-            raise ToolError(f"File not found: {self.paper.rel(path)}")
+            raise ToolError("File not found: {file}", file=self.paper.rel(path))
         return read_text(path)
 
     def stage_change(self, path: Path, proposed: str, description: str) -> ProposedChange:
@@ -218,7 +219,8 @@ class AgentEngine:
         tex = self.current_content(target)
         section = find_section(tex, section_title)
         if section is None:
-            raise ToolError(f"Section {section_title!r} not found in {self.paper.rel(target)}")
+            raise ToolError("Section '{section}' not found in {file}",
+                            section=section_title, file=self.paper.rel(target))
         report = validate_edit(section.body(tex), new_body)
         if not report.ok:
             raise ToolError("Edit rejected by LaTeX integrity check:\n- " + "\n- ".join(report.errors))
@@ -232,7 +234,7 @@ class AgentEngine:
         target = self.paper.resolve(path, for_write=True)
         tex = self.current_content(target)
         if find_section(tex, title) is not None:
-            raise ToolError(f"Section {title!r} already exists - use edit_section instead")
+            raise ToolError("Section '{section}' already exists - use edit_section instead", section=title)
         report = validate_fragment(body, {e.key for e in self.bib_entries()})
         if not report.ok:
             raise ToolError("Section rejected by LaTeX integrity check:\n- " + "\n- ".join(report.errors))
@@ -340,7 +342,7 @@ class AgentEngine:
                 results.append({"type": "tool_result", "tool_use_id": block.id,
                                 "content": output, "is_error": is_error})
             messages.append({"role": "user", "content": results})
-        raise AgentError(f"Agent did not finish within {limit} steps (AGENT_MAX_STEPS).")
+        raise AgentError("Agent did not finish within {limit} steps (AGENT_MAX_STEPS).", limit=limit)
 
     # ------------------------------------------------------------------ #
     # Change pipeline (human-in-the-loop state machine)
@@ -365,8 +367,8 @@ class AgentEngine:
             added = new_errors(baseline.errors, result.errors)
             if baseline.success and (not result.success or added):
                 problems = result.summary() if not result.success else "\n".join(added[:15])
-                raise AgentError(f"The change adds LaTeX errors the paper did not have before - rolled back.\n"
-                                 f"{problems}")
+                raise AgentError("The change adds LaTeX errors the paper did not have before - "
+                                 "rolled back.\n{problems}", problems=problems)
             if not result.success:
                 self.log("The paper did not compile before the change either; proceeding.", EventKind.WARNING)
             else:

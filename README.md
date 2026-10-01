@@ -210,7 +210,9 @@ list for all your papers**, shared with everyone you work with.
 ## Language (English / German)
 
 The **Language** menu switches the interface between English and Deutsch. The choice is saved and takes
-effect when the app restarts; it offers to restart for you.
+effect when the app restarts; it offers to restart for you. `docs/INSTALLATION_DE.md` is the German
+step-by-step setup guide for a colleague's computer, from the GitHub release page onwards; it ships in
+the zip next to `USER_GUIDE.md`, and **Help ▸ User guide** opens it when the interface is German.
 
 **Only the interface changes.** Your papers are always written in English:
 
@@ -224,11 +226,41 @@ This is enforced, not just intended. `tests/test_i18n.py` fails if a module that
 much as imports the translator, and it scaffolds a paper with the interface in German and compares it byte
 for byte with the English one.
 
+**Error messages translate too, without losing the English.** `core` does not call `t()` - it raises an
+English **template** that carries its fields (`core/user_errors.py`):
+
+```python
+raise GitOperationError("No remote named '{remote}'", remote=self.settings.remote_name)
+```
+
+`str(exc)` is then the English sentence and `core.i18n.translated(exc)` the German one, so the same
+error can be both: English in `agent.log`, in the tool results the model reads and in saved reports,
+German in the dialog and the status line. It is also what lets `figures.py`, `results_latex.py` and
+`latex_safety.py` raise a translatable error although they may never import the translator - they only
+carry the template; the GUI translates it. An error built the old way (a finished f-string) still works
+and simply falls back to English.
+
+Deliberately **not** translated, each for a reason stated in the code: the parse errors in
+`latex_parser.py` (they name a character index and are read by the log and the model), the plan-repair
+instruction in `results_workflow.py` (read by the model), and `core/sharepoint.py` (the Microsoft Graph
+route is hidden from the interface - translate it when the mode switch comes back).
+
 **Adding or fixing a translation:** the English text is the key. Edit `core/lang/de_menu.py` (buttons and
-menus), `de_forms.py` (forms and dialogs) or `de_status.py` (messages). Anything without a German entry
-falls back to English rather than breaking, and `test_every_translated_string_has_german` lists what is
-missing. Text that is also an identifier - the task names, the middle switch, the to-do filters - goes
-through `i18n.Choices`, which shows the translation but hands the English value back to the code.
+menus), `de_forms.py` (forms), `de_dialogs.py` (dialog titles, headings, intro texts and buttons),
+`de_status.py` / `de_detail.py` (messages), `de_errors.py` (Git, sign-in, Claude, updates, OneDrive) or
+`de_content.py` (sections, figures, results, PDFs, literature). Anything without a German entry falls
+back to English rather than breaking, and two tests list what is missing:
+`test_every_translated_string_has_german` for the interface and
+`test_every_error_message_core_raises_has_german` for the errors. Text that is also an identifier - the
+task names, the middle switch, the to-do filters - goes through `i18n.Choices`, which shows the
+translation but hands the English value back to the code.
+
+**A dialog translates its own chrome.** `gui/dialogs._Dialog` passes its `title`, `heading`, `text` and
+primary button through `t()`, so a subclass hands in plain English. Nothing did that until the German
+errors were added, which left every dialog - the first-start setup window included - entirely English in
+a German app, even though `de_forms.py` already held the German. The audit now reads those four
+arguments, the message-box titles and the labels handed to a menu as data straight out of the source, and
+`tests/test_gui_smoke.py` builds the real dialogs in German and reads their widgets back.
 
 ## Sign-in (once, inside the app)
 
@@ -445,7 +477,9 @@ core/
   references.py         → identifier resolution, de-duplication, BibTeX, \bibliography wiring
   registry.py           → workflow tab order
   i18n.py               → t(): the interface language; never imported by anything that writes a paper
-  lang/de_*.py          → the German catalogue (menus, forms, status messages)
+  user_errors.py        → UserMessage: an error carries its English template + fields, so str(exc)
+                          stays English (log, tool results, reports) while the screen shows German
+  lang/de_*.py          → the German catalogue (menus, forms, status, dialogs, errors, content)
   todos.py              → shared todo.md: format, operations, replay-on-conflict syncing
   global_todos.py       → the shared list's own repository, and moving old per-paper lists into it
   project_layout.py     → folder structure of a new local paper + starter files

@@ -24,7 +24,7 @@ from core.latex_parser import find_main_tex
 from core.preview import KIND_APPROVED, KIND_CURRENT, KIND_PROPOSED, PreviewBuilder, PreviewResult, source_signature
 from gui.dialogs import _Dialog
 from gui.panels import open_path
-from core.i18n import Choices, t
+from core.i18n import Choices, t, translated
 
 MUTED = "#8b949e"
 BADGES = {
@@ -215,9 +215,7 @@ class PushConfirmDialog(_Dialog):
         self.label(listed, color=MUTED)
         self.finish_layout(button, lambda: self.close(True))
         self.primary.configure(fg_color="#1f6f3a", hover_color="#27894a")
-        for child in self.buttons.winfo_children():
-            if isinstance(child, ctk.CTkButton) and child.cget("text") == "Cancel":
-                child.configure(text=cancel)
+        self.cancel_button.configure(text=t(cancel))
         self._decided = False
 
     def _grab(self) -> None:  # stay non-modal so the preview can be scrolled
@@ -326,7 +324,8 @@ class PreviewMixin:
             try:
                 self.bus.emit(EventKind.PREVIEW, "", result=builder.current(root, main_rel), done=True)
             except Exception as exc:  # noqa: BLE001 - reported in the log
-                self.bus.emit(EventKind.ERROR, f"Preview compile failed: {exc}")
+                self.bus.emit(EventKind.ERROR, t("Preview compile failed: {problem}",
+                                                 problem=translated(exc)))
                 self.bus.emit(EventKind.PREVIEW, "", done=True)
 
         threading.Thread(target=work, daemon=True, name="preview-compile").start()

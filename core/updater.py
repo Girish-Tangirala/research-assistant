@@ -32,13 +32,14 @@ from pathlib import Path
 
 from core.dependencies import DependencyError, Installer, Progress, _get, download
 from core.proc import NO_WINDOW
+from core.user_errors import UserMessage
 
 logger = logging.getLogger("research_agent")
 APP_EXE = "ResearchAssistant.exe"
 ASSET_RE = re.compile(r"^ResearchAssistant-windows-[\w.\-]+\.zip$")
 
 
-class UpdateError(RuntimeError):
+class UpdateError(UserMessage, RuntimeError):
     """An update could not be found, downloaded, checked or installed."""
 
 
@@ -68,18 +69,20 @@ def latest_release(repo: str, release: dict | None = None) -> Release:
         try:
             release = json.loads(_get(f"https://api.github.com/repos/{repo}/releases/latest", timeout=15))
         except OSError as exc:
-            raise UpdateError(f"Could not reach GitHub to check for updates ({exc}).") from exc
+            raise UpdateError("Could not reach GitHub to check for updates ({problem}).",
+                              problem=exc) from exc
     version = str(release.get("tag_name", "")).lstrip("v")
     for asset in release.get("assets", []):
         name = asset.get("name", "")
         digest = str(asset.get("digest") or "")
         if ASSET_RE.match(name):
             if not re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest):
-                raise UpdateError(f"Release {version} has no checksum for {name} - not installing it.")
+                raise UpdateError("Release {version} has no checksum for {name} - not installing it.",
+                                  version=version, name=name)
             installer = Installer("app", name, asset["browser_download_url"], digest[7:].lower(),
                                   int(asset.get("size") or 0))
             return Release(version, (release.get("body") or "").strip(), release.get("html_url", ""), installer)
-    raise UpdateError(f"Release {version} has no Windows app attached.")
+    raise UpdateError("Release {version} has no Windows app attached.", version=version)
 
 
 def check(current: str, repo: str) -> Release | None:
@@ -103,8 +106,8 @@ def stage(release: Release, app_dir: Path, progress: Progress | None = None,
     """Download and unpack the new version beside ``app_dir``; return the folder ready to swap in."""
     parent = app_dir.parent
     if not os.access(parent, os.W_OK):
-        raise UpdateError(f"The app's folder {parent} is not writable - move the Research Assistant folder "
-                          "to e.g. Documents and update again.")
+        raise UpdateError("The app's folder {folder} is not writable - move the Research Assistant "
+                          "folder to e.g. Documents and update again.", folder=parent)
     started = time.monotonic()
     logger.info("Update %s: downloading %s", release.version, release.asset.url)
     try:
@@ -120,11 +123,11 @@ def stage(release: Release, app_dir: Path, progress: Progress | None = None,
         for member in bundle.namelist():  # never write outside the unpack folder
             target = (unpack / member).resolve()
             if not target.is_relative_to(unpack.resolve()):
-                raise UpdateError(f"Unexpected file in the update: {member}")
+                raise UpdateError("Unexpected file in the update: {file}", file=member)
         bundle.extractall(unpack)
     inner = next((p.parent for p in unpack.rglob(APP_EXE)), None)
     if inner is None:
-        raise UpdateError(f"The update does not contain {APP_EXE}.")
+        raise UpdateError("The update does not contain {name}.", name=APP_EXE)
     inner.rename(staged)
     shutil.rmtree(unpack, ignore_errors=True)
     shutil.rmtree(archive.parent, ignore_errors=True)

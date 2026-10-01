@@ -18,7 +18,7 @@ from core.credentials import host_of
 from core.events import EventKind
 from core.git_manager import GitManager
 from gui.dialogs import _Dialog, run_in_background
-from core.i18n import t
+from core.i18n import t, translated
 
 HELP = ("One shared to-do list for all your papers, kept in a small Git repository of its own - "
         "not in a paper, so a to-do change never touches a manuscript and never waits for Sync.\n\n"
@@ -36,7 +36,7 @@ class TodoRepoDialog(_Dialog):
         self.on_save = on_save
         self.url = self.entry(t("Repository link"), settings.url,
                               placeholder="https://github.com/you/research-todo.git")
-        self.branch = self.entry(t("Branch (optional)"), settings.branch, placeholder="leave empty for the default")
+        self.branch = self.entry(t("Branch (optional)"), settings.branch, placeholder=t("leave empty for the default"))
         self.hint = ctk.CTkLabel(self.body, text="", text_color="#8b949e", anchor="w", justify="left",
                                  wraplength=460)
         self.hint.grid(row=self._row, column=0, sticky="ew", pady=(0, 8))
@@ -47,8 +47,9 @@ class TodoRepoDialog(_Dialog):
 
     def _show_host(self) -> None:
         host = host_of(self.url.get().strip())
-        self.hint.configure(text=f"You will need a sign-in for {host} under Accounts, with permission to "
-                                 f"read and write this repository." if host else "")
+        self.hint.configure(text=t("You will need a sign-in for {host} under Accounts, with "
+                                   "permission to read and write this repository.", host=host)
+                            if host else "")
 
     def submit(self) -> None:
         settings = TodoRepoSettings(url=self.url.get().strip(), branch=self.branch.get().strip())
@@ -94,7 +95,7 @@ class TodoSetupMixin:
         try:
             store = self.todo.ctx.make_store()
         except TodoError as exc:
-            messagebox.showwarning(t("Move the to-do lists"), str(exc), parent=self)
+            messagebox.showwarning(t("Move the to-do lists"), translated(exc), parent=self)
             return
 
         def job():

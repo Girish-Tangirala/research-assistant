@@ -34,19 +34,20 @@ class LocalLibraryClient:
         """Fail early with something the user can act on."""
         if not self.root.exists():
             raise SharePointError(
-                f"{self.root} does not exist. Open OneDrive, make sure that folder is synced to this "
-                "computer, then choose it again.")
+                "{folder} does not exist. Open OneDrive, make sure that folder is synced to this "
+                "computer, then choose it again.", folder=self.root)
         if not self.root.is_dir():
-            raise SharePointError(f"{self.root} is a file, not a folder.")
+            raise SharePointError("{folder} is a file, not a folder.", folder=self.root)
         if not os.access(self.root, os.W_OK):
-            raise SharePointError(f"{self.root} cannot be written to. Check your access to the library.")
+            raise SharePointError("{folder} cannot be written to. Check your access to the library.",
+                                  folder=self.root)
 
     def _resolve(self, path: str) -> Path:
         """``a/b`` → the real path, refusing anything that escapes the library folder."""
         target = (self.root / path.strip("/")).resolve()
         root = self.root.resolve()
         if target != root and root not in target.parents:
-            raise SharePointError(f"{path!r} is outside the library folder.")
+            raise SharePointError("'{file}' is outside the library folder.", file=path)
         return target
 
     def index(self, path: str) -> dict[str, RemoteFile]:
@@ -71,7 +72,8 @@ class LocalLibraryClient:
         try:
             self._resolve(path).mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            raise SharePointError(f"Could not create {path!r} in the library folder: {exc}") from exc
+            raise SharePointError("Could not create '{folder}' in the library folder: {problem}",
+                                  folder=path, problem=exc) from exc
 
     def upload(self, local: Path, remote_path: str,
                progress: Callable[[int, int], None] | None = None) -> None:
@@ -84,7 +86,8 @@ class LocalLibraryClient:
             os.replace(partial, target)
         except OSError as exc:
             partial.unlink(missing_ok=True)
-            raise SharePointError(f"Could not copy {local.name} into the library folder: {exc}") from exc
+            raise SharePointError("Could not copy {name} into the library folder: {problem}",
+                                  name=local.name, problem=exc) from exc
         if progress:
             size = local.stat().st_size
             progress(size, size)

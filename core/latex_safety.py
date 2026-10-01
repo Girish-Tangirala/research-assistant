@@ -24,6 +24,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from core.latex_parser import CITE_RE, comment_mask, match_brace
+from core.user_errors import UserMessage
 
 TOKEN_RE = re.compile(r"⟦L(\d{4})⟧")
 
@@ -50,12 +51,14 @@ FORBIDDEN_PRIMITIVES = (
 PROSE_SPECIALS = ("&", "#", "_", "^")
 
 
-class LatexIntegrityError(ValueError):
+class LatexIntegrityError(UserMessage, ValueError):
     """Raised when an edit would corrupt the LaTeX source."""
 
     def __init__(self, problems: list[str]) -> None:
         self.problems = problems
-        super().__init__("LaTeX integrity check failed:\n- " + "\n- ".join(problems))
+        # The heading translates; the problems themselves are LaTeX, so they do not.
+        super().__init__("LaTeX integrity check failed:\n- {problems}",
+                         problems="\n- ".join(problems))
 
 
 # ---------------------------------------------------------------------- #

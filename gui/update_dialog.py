@@ -18,7 +18,7 @@ from core.dependencies import tools_dir
 from core.updater import Release, UpdateError, check, launch_swap, running_app_dir, stage
 from gui.dialogs import MUTED, OK, _Dialog, run_in_background
 from version import UPDATE_REPO, __version__
-from core.i18n import t
+from core.i18n import t, translated
 
 logger = logging.getLogger("research_agent")
 UPDATING = "Updating, app will restart after update"
@@ -26,12 +26,14 @@ UPDATING = "Updating, app will restart after update"
 
 class UpdateDialog(_Dialog):
     def __init__(self, master: Any, release: Release, on_done: Callable[[bool], None]) -> None:
-        super().__init__(master, "Update available", f"Version {release.version} is available",
-                         f"You have version {__version__}. Your papers, settings and sign-ins are kept.")
+        super().__init__(master, "Update available",
+                         t("Version {version} is available", version=release.version),
+                         t("You have version {current}. Your papers, settings and sign-ins are kept.",
+                           current=__version__))
         self.release, self.on_done = release, on_done
         self.app_dir = running_app_dir()
         if release.notes:
-            self.label("What's new:")
+            self.label(t("What's new:"))
             notes = ctk.CTkTextbox(self.body, width=460, height=150, wrap="word")
             notes.insert("1.0", release.notes[:3000])
             notes.configure(state="disabled")
@@ -40,16 +42,14 @@ class UpdateDialog(_Dialog):
         self.bar = ctk.CTkProgressBar(self.body, width=460)
         self.bar.set(0)
         if self.app_dir is None:
-            self.label("You are running the app from its source code - update it with Git (git pull) instead.",
+            self.label(t("You are running the app from its source code - update it with Git (git pull) instead."),
                        color=MUTED)
             self.finish_layout("Open release page", lambda: webbrowser.open(release.page))
         else:
             self.bar.grid(row=self._row, column=0, sticky="ew", pady=(4, 4))
             self._row += 1
             self.finish_layout("Update now", self.start)
-        for child in self.buttons.winfo_children():
-            if isinstance(child, ctk.CTkButton) and child.cget("text") == "Cancel":
-                child.configure(text=t("Later"))
+        self.cancel_button.configure(text=t("Later"))
         self._progress = (0, 0)
         self._running = False
 
@@ -95,11 +95,12 @@ class UpdateDialog(_Dialog):
         self.update_idletasks()
         launch = lambda: launch_swap(self.app_dir, staged, tools_dir() / "updates")  # noqa: E731
         if not self.master.quit_for_update(launch):
-            self.fail("Update not installed: the app was not closed. It is downloaded; choose Update now again.")
+            self.fail(t("Update not installed: the app was not closed. It is downloaded; choose Update now "
+                    "again."))
 
     def _failed(self, exc: Exception) -> None:
         self._running = False
-        self.fail(t("The update could not be installed: {problem}", problem=exc))
+        self.fail(t("The update could not be installed: {problem}", problem=translated(exc)))
 
     def cancel(self) -> None:
         if not self._running:
@@ -120,13 +121,13 @@ class UpdateMixin:
                 UpdateDialog(self, release, on_done=lambda _ok: then() if then else None)
                 return
             if verbose:
-                messagebox.showinfo("Updates", t("You have the latest version ({version}).", version=__version__), parent=self)
+                messagebox.showinfo(t("Updates"), t("You have the latest version ({version}).", version=__version__), parent=self)
             if then:
                 then()
 
         def failed(exc: Exception) -> None:
             if verbose:
-                messagebox.showwarning("Updates", str(exc), parent=self)
+                messagebox.showwarning(t("Updates"), translated(exc), parent=self)
             if then:
                 then()
 
@@ -147,7 +148,7 @@ class UpdateMixin:
         try:
             launch()
         except (OSError, UpdateError) as exc:
-            messagebox.showerror(t("Update"), t("Could not start the update: {problem}", problem=exc), parent=self)
+            messagebox.showerror(t("Update"), t("Could not start the update: {problem}", problem=translated(exc)), parent=self)
             return False
         self._save_state()
         if self.cancel_token:

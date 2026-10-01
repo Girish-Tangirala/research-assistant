@@ -24,13 +24,14 @@ import anthropic
 from anthropic.types.beta import BetaMessage
 
 from config import LLMSettings
+from core.user_errors import UserMessage
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 TextCallback = Callable[[str], None]
 
 
-class LLMError(RuntimeError):
+class LLMError(UserMessage, RuntimeError):
     """Base class for LLM failures surfaced to the user."""
 
 
@@ -117,31 +118,33 @@ class LLMClient:
                 "Claude rejected the stored API key. Sign in again via Accounts → Claude."
             ) from exc
         except anthropic.PermissionDeniedError as exc:
-            raise LLMError(f"Claude API permission denied: {exc.message}") from exc
+            raise LLMError("Claude API permission denied: {problem}", problem=exc.message) from exc
         except anthropic.NotFoundError as exc:
-            raise LLMError(
-                f"Model {self.settings.model!r} not found or not enabled for this key."
-            ) from exc
+            raise LLMError("Model '{model}' not found or not enabled for this key.",
+                           model=self.settings.model) from exc
         except anthropic.RateLimitError as exc:
             retry_after = exc.response.headers.get("retry-after", "?")
-            raise LLMError(f"Rate limited by the Claude API (retry after {retry_after}s).") from exc
+            raise LLMError("Rate limited by the Claude API (retry after {seconds}s).",
+                           seconds=retry_after) from exc
         except anthropic.BadRequestError as exc:
             hint = ""
             if "web_search" in str(exc.message):
                 hint = (" - web search may not be enabled for your organization "
                         "(Claude Console → Settings → Privacy), or turn off 'Use Claude web search'.")
-            raise LLMError(f"Claude API rejected the request: {exc.message}{hint}") from exc
+            raise LLMError("Claude API rejected the request: {problem}{hint}",
+                           problem=exc.message, hint=hint) from exc
         except anthropic.APIStatusError as exc:
-            raise LLMError(
-                f"Claude API error {exc.status_code}: {exc.message} (request id: {exc.request_id})"
-            ) from exc
+            raise LLMError("Claude API error {status}: {problem} (request id: {request})",
+                           status=exc.status_code, problem=exc.message,
+                           request=exc.request_id) from exc
         except anthropic.APIConnectionError as exc:
             raise LLMError("Could not reach the Claude API - check your network connection.") from exc
 
         if message.stop_reason == "refusal":
             details = message.stop_details
             category = getattr(details, "category", None) if details else None
-            raise LLMRefusal(f"The model declined this request (category: {category or 'unspecified'}).")
+            raise LLMRefusal("The model declined this request (category: {category}).",
+                             category=category or "unspecified")
         return message
 
 

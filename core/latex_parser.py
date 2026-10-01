@@ -11,6 +11,12 @@ text, so edits can be spliced back without touching anything else in the file.
 
 from __future__ import annotations
 
+# The ValueErrors raised here name a character index in the source ("Unbalanced
+# braces starting at index 412"). They are diagnostics for the log and for the
+# model's tool results, not sentences a user acts on, so they are not translated -
+# which is also why this module, whose output goes into a paper, must never import
+# core.i18n.
+
 import re
 from dataclasses import dataclass, field
 from pathlib import Path

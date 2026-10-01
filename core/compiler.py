@@ -24,6 +24,7 @@ from pathlib import Path
 from config import LatexSettings
 from core.latex_parser import flatten_inputs, strip_comments
 from core.proc import NO_WINDOW
+from core.user_errors import UserMessage
 
 _ERROR_LINE_RE = re.compile(r"^(?:!.*|.*:\d+: .*)$", re.MULTILINE)
 _UNDEF_RE = re.compile(r"(?:Citation|Reference) `([^']+)' on page \d+ undefined", re.MULTILINE)
@@ -61,7 +62,7 @@ def detect_bib_tool(tex: str) -> str | None:
     return None
 
 
-class CompilerNotFoundError(RuntimeError):
+class CompilerNotFoundError(UserMessage, RuntimeError):
     """No LaTeX toolchain is installed / configured."""
 
 
@@ -134,7 +135,7 @@ class LatexCompiler:
         elif self.settings.pdflatex_path:
             engine_path = self._tool(engine)
             if engine_path is None:
-                raise CompilerNotFoundError(f"This paper needs {engine}, which was not found.")
+                raise CompilerNotFoundError("This paper needs {engine}, which was not found.", engine=engine)
             run = [engine_path, "-interaction=nonstopmode", "-file-line-error",
                    "-no-shell-escape", "-synctex=1", f"-output-directory={outdir}", main_tex.name]
             steps = [run]
@@ -178,7 +179,7 @@ class LatexCompiler:
                     stdin=subprocess.DEVNULL, creationflags=NO_WINDOW,
                 )
             except FileNotFoundError as exc:
-                raise CompilerNotFoundError(f"Compiler executable not found: {cmd[0]}") from exc
+                raise CompilerNotFoundError("Compiler executable not found: {program}", program=cmd[0]) from exc
             except subprocess.TimeoutExpired:
                 return CompileResult(False, None, -1, [f"Timed out after {self.settings.timeout_s}s: {Path(cmd[0]).name}"])
             output += proc.stdout + proc.stderr

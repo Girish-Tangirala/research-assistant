@@ -10,7 +10,7 @@ from core.credentials import CredentialError, host_of, mask
 from core.events import EventKind
 from gui.dialogs import ClaudeLoginDialog, GitLoginDialog, OpenAlexKeyDialog
 from gui.menubar import AccountSection
-from core.i18n import t
+from core.i18n import t, translated
 
 
 class AccountsMixin:
@@ -20,33 +20,35 @@ class AccountsMixin:
         try:
             return fn()
         except CredentialError as exc:
-            self.panel.append(EventKind.ERROR, str(exc))
+            self.panel.append(EventKind.ERROR, translated(exc))
             return default
 
     def _account_sections(self) -> list[AccountSection]:
         """Current sign-in state for the Accounts menu."""
         key = self._safe(self.store.get_claude_key)
         sections = [AccountSection(
-            f"Claude: signed in ({mask(key)})" if key else "Claude: not signed in",
-            [("Change API key…" if key else "Sign in…", self._login_claude, True),
-             ("Sign out", self._logout_claude, bool(key))])]
+            t("Claude: signed in ({key})", key=mask(key)) if key else t("Claude: not signed in"),
+            [(t("Change API key…") if key else t("Sign in…"), self._login_claude, True),
+             (t("Sign out"), self._logout_claude, bool(key))])]
 
         host, _ = self._paper_host(self.app_state.current)
         cred = self._safe(lambda: self.store.get_git(host)) if host else None
         if host:
-            status = f"Git ({host}): signed in as {cred.username}" if cred else f"Git ({host}): not signed in"
+            status = t("Git ({host}): signed in as {user}", host=host, user=cred.username) if cred \
+                else t("Git ({host}): not signed in", host=host)
         else:
-            status = "Git: no sign-in needed (local or SSH)" if self.app_state.current else "Git: add a paper first"
+            status = t("Git: no sign-in needed (local or SSH)") if self.app_state.current \
+                else t("Git: add a paper first")
         sections.append(AccountSection(status, [
-            ("Change token…" if cred else "Sign in…", self._login_git, bool(host)),
-            ("Sign out", self._logout_git, bool(cred))]))
+            (t("Change token…") if cred else t("Sign in…"), self._login_git, bool(host)),
+            (t("Sign out"), self._logout_git, bool(cred))]))
         sections += self._todo_host_section(host)
 
         oa = self._safe(self.store.get_openalex_key)
         sections.append(AccountSection(
-            "OpenAlex key: set" if oa else "OpenAlex key: not set (optional)",
-            [("Change key…" if oa else "Add key…", self._login_openalex, True),
-             ("Remove key", self._logout_openalex, bool(oa))]))
+            t("OpenAlex key: set") if oa else t("OpenAlex key: not set (optional)"),
+            [(t("Change key…") if oa else t("Add key…"), self._login_openalex, True),
+             (t("Remove key"), self._logout_openalex, bool(oa))]))
         sections.append(self._sharepoint_section())
         return sections
 
@@ -61,11 +63,11 @@ class AccountsMixin:
         if not host or host == paper_host:
             return []
         cred = self._safe(lambda: self.store.get_git(host))
-        status = (f"Shared to-do list ({host}): signed in as {cred.username}" if cred
-                  else f"Shared to-do list ({host}): not signed in")
+        status = (t("Shared to-do list ({host}): signed in as {user}", host=host, user=cred.username)
+                  if cred else t("Shared to-do list ({host}): not signed in", host=host))
         return [AccountSection(status, [
-            ("Change token…" if cred else "Sign in…", self._login_todo_git, True),
-            ("Sign out", self._logout_todo_git, bool(cred))])]
+            (t("Change token…") if cred else t("Sign in…"), self._login_todo_git, True),
+            (t("Sign out"), self._logout_todo_git, bool(cred))])]
 
     def _login_todo_git(self) -> None:
         settings = self.app_state.todo_repo

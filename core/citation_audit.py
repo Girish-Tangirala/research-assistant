@@ -12,6 +12,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from core.user_errors import UserMessage
 from core.latex_parser import (
     BibEntry,
     Citation,
@@ -21,6 +22,14 @@ from core.latex_parser import (
     flatten_inputs,
     load_bib_files,
 )
+
+class NoMainDocumentError(UserMessage, FileNotFoundError):
+    """No main .tex document was found.
+
+    Still a ``FileNotFoundError``, so every existing handler keeps catching it; it
+    carries its template so a German window can show it (see :mod:`core.user_errors`).
+    """
+
 
 DOI_EXPECTED_TYPES = {"article", "inproceedings", "incollection", "conference", "proceedings"}
 DOI_OPTIONAL_TYPES = {"book", "inbook", "phdthesis", "mastersthesis", "techreport"}
@@ -154,11 +163,12 @@ def run_audit(project_root: Path, main_tex: Path | None = None) -> AuditReport:
     """Audit a whole project rooted at ``project_root``.
 
     Raises:
-        FileNotFoundError: if no main .tex document can be found.
+        NoMainDocumentError: if no main .tex document can be found (a FileNotFoundError).
     """
     main = main_tex or find_main_tex(project_root)
     if main is None:
-        raise FileNotFoundError(f"No .tex file with \\documentclass found under {project_root}")
+        raise NoMainDocumentError("No .tex file with \\documentclass found under {folder}",
+                                  folder=project_root)
     tex = flatten_inputs(main, project_root)
     bib_paths = find_bib_files(tex, project_root)
     entries = load_bib_files(bib_paths, project_root)

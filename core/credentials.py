@@ -25,6 +25,7 @@ from typing import Protocol
 from urllib.parse import urlparse
 
 from core.proc import NO_WINDOW
+from core.user_errors import UserMessage
 
 SERVICE = "ScientificResearchAssistant"
 CLAUDE_KEY = "claude_api_key"
@@ -44,7 +45,7 @@ GIT_TOKEN_HELP = {
 }
 
 
-class CredentialError(RuntimeError):
+class CredentialError(UserMessage, RuntimeError):
     """A credential could not be stored, loaded or verified."""
 
 
@@ -122,20 +123,20 @@ class CredentialStore:
         try:
             return self._backend.get_password(SERVICE, key)
         except Exception as exc:  # keyring raises backend-specific errors
-            raise CredentialError(f"Could not read from the credential vault: {exc}") from exc
+            raise CredentialError("Could not read from the credential vault: {problem}", problem=exc) from exc
 
     def _set(self, key: str, value: str) -> None:
         try:
             self._backend.set_password(SERVICE, key, value)
         except Exception as exc:
-            raise CredentialError(f"Could not save to the credential vault: {exc}") from exc
+            raise CredentialError("Could not save to the credential vault: {problem}", problem=exc) from exc
 
     def _delete(self, key: str) -> None:
         try:
             if self._backend.get_password(SERVICE, key) is not None:
                 self._backend.delete_password(SERVICE, key)
         except Exception as exc:
-            raise CredentialError(f"Could not delete from the credential vault: {exc}") from exc
+            raise CredentialError("Could not delete from the credential vault: {problem}", problem=exc) from exc
 
     # -- Claude ---------------------------------------------------------- #
     def get_claude_key(self) -> str | None:
@@ -221,13 +222,16 @@ def verify_claude_key(api_key: str, model: str, timeout: float = 30.0) -> str:
     except anthropic.AuthenticationError as exc:
         raise CredentialError("This API key was rejected. Check that it was copied completely.") from exc
     except anthropic.PermissionDeniedError as exc:
-        raise CredentialError(f"The key is valid but lacks permission: {exc.message}") from exc
+        raise CredentialError("The key is valid but lacks permission: {problem}",
+                              problem=exc.message) from exc
     except anthropic.NotFoundError as exc:
-        raise CredentialError(f"The key works, but model {model!r} is not available to it.") from exc
+        raise CredentialError("The key works, but model '{model}' is not available to it.",
+                              model=model) from exc
     except anthropic.APIConnectionError as exc:
         raise CredentialError("Could not reach the Claude API - check your internet connection.") from exc
     except anthropic.APIStatusError as exc:
-        raise CredentialError(f"Claude API error {exc.status_code}: {exc.message}") from exc
+        raise CredentialError("Claude API error {status}: {problem}",
+                              status=exc.status_code, problem=exc.message) from exc
     return info.display_name
 
 
@@ -249,13 +253,14 @@ def verify_git_access(url: str, credential: GitCredential | None, timeout: float
     except FileNotFoundError as exc:
         raise CredentialError("git is not installed or not on PATH.") from exc
     except subprocess.TimeoutExpired as exc:
-        raise CredentialError(f"Timed out contacting {host_of(url)}.") from exc
+        raise CredentialError("Timed out contacting {host}.", host=host_of(url)) from exc
     if proc.returncode != 0:
         detail = redact(proc.stderr.strip(), credential)
         lowered = detail.lower()
         if any(s in lowered for s in ("authentication", "403", "401", "could not read username", "denied")):
-            raise CredentialError(f"{host_of(url)} rejected these credentials.\n{detail}")
-        raise CredentialError(f"Could not access the repository:\n{detail}")
+            raise CredentialError("{host} rejected these credentials.\n{detail}",
+                                  host=host_of(url), detail=detail)
+        raise CredentialError("Could not access the repository:\n{detail}", detail=detail)
 
 
 def verify_openalex_key(api_key: str, timeout: float = 20.0) -> None:
@@ -279,6 +284,6 @@ def verify_openalex_key(api_key: str, timeout: float = 20.0) -> None:
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):
             raise CredentialError("OpenAlex rejected this API key.") from exc
-        raise CredentialError(f"OpenAlex returned HTTP {exc.code}.") from exc
+        raise CredentialError("OpenAlex returned HTTP {status}.", status=exc.code) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
-        raise CredentialError(f"Could not reach OpenAlex: {exc}") from exc
+        raise CredentialError("Could not reach OpenAlex: {problem}", problem=exc) from exc

@@ -18,6 +18,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from core.user_errors import UserMessage
 
 SUFFIXES = (".csv", ".tsv", ".txt", ".log", ".json", ".xlsx", ".xlsm")
 MAX_FILE_MB = 25
@@ -30,7 +31,7 @@ _REPORT_ROW = re.compile(r"^\s*(?P<name>\S.*?)\s{2,}(?P<nums>[\d.]+(?:\s+[\d.]+)
 _NUMBER_ROW = re.compile(r"^[\s\[\]|,]*-?\d[\d.eE+\-\s,]*[\s\[\]|,]*$")
 
 
-class ResultsError(ValueError):
+class ResultsError(UserMessage, ValueError):
     """A results file cannot be read or contains no usable numbers."""
 
 
@@ -56,8 +57,9 @@ class ResultTable:
         try:
             return self.columns.index(column)
         except ValueError as exc:
-            raise ResultsError(f"{self.name}: no column named {column!r} "
-                               f"(it has {', '.join(self.columns)})") from exc
+            raise ResultsError("{table}: no column named '{column}' (it has {columns})",
+                               table=self.name, column=column,
+                               columns=", ".join(self.columns)) from exc
 
     def values(self, column: str) -> list[object]:
         at = self.index(column)
@@ -136,15 +138,15 @@ def _read_csv(path: Path) -> list[ResultTable]:
         delimiter = "\t" if "\t" in sample else ";" if sample.count(";") > sample.count(",") else ","
     raw = [r for r in csv.reader(text.splitlines(), delimiter=delimiter) if r]
     if not raw:
-        raise ResultsError(f"{path.name} has no rows.")
+        raise ResultsError("{name} has no rows.", name=path.name)
     header, body = raw[0], raw[1:]
     if not body or all(isinstance(_as_number(c), (int, float)) for c in header if c.strip()):
         header, body = [f"column {i}" for i in range(1, len(raw[0]) + 1)], raw
     rows = [[_as_number(c) for c in row] for row in body]
     table = _table(path.stem, header, rows, path, f"{len(rows)} rows read from {path.name}")
     if table is None:
-        raise ResultsError(f"{path.name} has no table of results: expected columns of values "
-                           "separated by commas, semicolons or tabs.")
+        raise ResultsError("{name} has no table of results: expected columns of values "
+                           "separated by commas, semicolons or tabs.", name=path.name)
     return [table]
 
 
@@ -170,7 +172,7 @@ def _read_excel(path: Path) -> list[ResultTable]:
     finally:
         book.close()
     if not tables:
-        raise ResultsError(f"{path.name} has no sheet with a header row and data.")
+        raise ResultsError("{name} has no sheet with a header row and data.", name=path.name)
     return tables
 
 
@@ -189,7 +191,8 @@ def _read_json(path: Path) -> list[ResultTable]:
     try:
         data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
     except json.JSONDecodeError as exc:
-        raise ResultsError(f"{path.name} is not valid JSON ({exc.msg}, line {exc.lineno}).") from exc
+        raise ResultsError("{name} is not valid JSON ({problem}, line {line}).",
+                           name=path.name, problem=exc.msg, line=exc.lineno) from exc
 
     if isinstance(data, dict):
         series = _flatten_history(data)
@@ -225,8 +228,9 @@ def _read_json(path: Path) -> list[ResultTable]:
         if table:
             return [table]
 
-    raise ResultsError(f"{path.name}: no table of numbers found. Expected a history "
-                       "({\"loss\": [...]}) , a list of records or one object per model.")
+    raise ResultsError("{name}: no table of numbers found. Expected a history "
+                       "(a loss/accuracy list), a list of records or one object per model.",
+                       name=path.name)
 
 
 def _read_report_text(text: str, path: Path) -> ResultTable | None:
@@ -289,8 +293,8 @@ def _read_text(path: Path) -> list[ResultTable]:
     try:
         return _read_csv(path)
     except ResultsError as exc:
-        raise ResultsError(f"{path.name}: no classification report, confusion matrix or table of "
-                           "columns found.") from exc
+        raise ResultsError("{name}: no classification report, confusion matrix or table of "
+                           "columns found.", name=path.name) from exc
 
 
 READERS = {".csv": _read_csv, ".tsv": _read_csv, ".json": _read_json, ".txt": _read_text, ".log": _read_text,
@@ -303,15 +307,17 @@ READERS = {".csv": _read_csv, ".tsv": _read_csv, ".json": _read_json, ".txt": _r
 def read_file(path: Path) -> list[ResultTable]:
     """Read one results file. Raises :class:`ResultsError` with a plain reason."""
     if not path.is_file():
-        raise ResultsError(f"{path} is not a file.")
+        raise ResultsError("{file} is not a file.", file=path)
     size_mb = path.stat().st_size / 1_000_000
     if size_mb > MAX_FILE_MB:
-        raise ResultsError(f"{path.name} is {size_mb:.0f} MB - too large to read "
-                           f"(limit {MAX_FILE_MB} MB). Export the summary you want to plot.")
+        raise ResultsError("{name} is {size} MB - too large to read (limit {limit} MB). "
+                           "Export the summary you want to plot.",
+                           name=path.name, size=f"{size_mb:.0f}", limit=MAX_FILE_MB)
     reader = READERS.get(path.suffix.lower())
     if reader is None:
-        raise ResultsError(f"{path.name}: {path.suffix or 'this file type'} is not supported "
-                           f"(supported: {', '.join(SUFFIXES)}).")
+        raise ResultsError("{name}: {kind} is not supported (supported: {known}).",
+                           name=path.name, kind=path.suffix or "this file type",
+                           known=", ".join(SUFFIXES))
     return reader(path)
 
 

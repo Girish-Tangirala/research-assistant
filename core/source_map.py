@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from core.latex_parser import CITE_RE, comment_mask, match_brace, split_sections, strip_comments
+from core.user_errors import UserMessage
 
 KIND_TEXT, KIND_HEADING, KIND_FIGURE, KIND_TABLE, KIND_MATH = "text", "heading", "figure", "table", "math"
 KIND_PREAMBLE, KIND_BIBLIOGRAPHY, KIND_OTHER = "preamble", "bibliography", "other"
@@ -331,7 +332,7 @@ def classify(root: Path, rel: str, line: int, on_image: bool = False) -> ClickTa
     return target
 
 
-class ClickLookupError(Exception):
+class ClickLookupError(UserMessage, Exception):
     """A click could not be mapped to the paper's source (message is user-facing)."""
 
 
@@ -360,8 +361,8 @@ def target_for_click(pdf: Path, page: int, x: float, y: float, source_root: Path
         rel = repo_relative(location.path, [root])
         if rel is not None and (root / rel).is_file():
             return classify(root, rel, location.line, on_image=image_at(pdf, page, x, y))
-    raise ClickLookupError(f"That text comes from {location.path.name}, which is not part of the paper "
-                           "(e.g. a package or class file).")
+    raise ClickLookupError("That text comes from {name}, which is not part of the paper "
+                           "(e.g. a package or class file).", name=location.path.name)
 
 
 # ---------------------------------------------------------------------- #

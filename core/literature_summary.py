@@ -110,8 +110,9 @@ def run_summary(workflow: "LiteratureReviewWorkflow") -> "WorkflowResult":
     if not files and not identifiers:
         raise AgentError("Choose a PDF or enter a DOI, arXiv id or link of the paper to summarise.")
     if len(files) + len(identifiers) > MAX_PAPERS:
-        raise AgentError(f"That is {len(files) + len(identifiers)} papers; summarise at most {MAX_PAPERS} "
-                         "at a time so one run stays quick and affordable.")
+        raise AgentError("That is {count} papers; summarise at most {limit} at a time so one run "
+                         "stays quick and affordable.",
+                         count=len(files) + len(identifiers), limit=MAX_PAPERS)
 
     engine.set_state(WorkflowState.SYNCING)
     paper.git.sync()

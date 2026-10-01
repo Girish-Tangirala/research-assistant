@@ -23,7 +23,7 @@ from core.credentials import (
     DEFAULT_GIT_USERNAMES, GIT_TOKEN_HELP, CredentialError, CredentialStore, GitCredential,
     host_of, verify_claude_key, verify_git_access, verify_openalex_key,
 )
-from core.i18n import t
+from core.i18n import t, translated
 
 MUTED = "#8b949e"
 ERROR = "#f85149"
@@ -102,6 +102,15 @@ class _Dialog(ctk.CTkToplevel):
     window is clamped to the display it opens on. A colleague's smaller screen
     once pushed Save and Cancel off the bottom of *Add paper*, with the dialog
     fixed-size so there was no way to reach them.
+
+    **The chrome translates here, once.** ``title``, ``heading``, ``text`` and the
+    primary button are passed through :func:`core.i18n.t`, so a subclass hands in
+    plain English and gets a German dialog. A subclass that needs a name or a
+    version in the text translates it itself and passes the finished sentence;
+    translating it again is a no-op, because an unknown string falls back to
+    itself. ``tests/test_i18n.py`` reads these four arguments out of every
+    subclass and fails if one has no German - they were English for two releases
+    because nothing looked them up at either end.
     """
 
     MAX_WIDTH_FRACTION = 0.95
@@ -111,7 +120,7 @@ class _Dialog(ctk.CTkToplevel):
 
     def __init__(self, master: Any, title: str, heading: str, text: str) -> None:
         super().__init__(master)
-        self.title(title)
+        self.title(t(title))
         self.resizable(False, True)      # the height can be adjusted on a short screen
         self.transient(master)
         self.status = ctk.CTkLabel(self, text="", wraplength=460, justify="left")
@@ -122,9 +131,9 @@ class _Dialog(ctk.CTkToplevel):
         self.body.pack(side="top", fill="both", expand=True, padx=14, pady=(16, 0))
         self.body.grid_columnconfigure(0, weight=1)
         self._row = 0
-        self.label(heading, font=ctk.CTkFont(size=17, weight="bold"))
+        self.label(t(heading), font=ctk.CTkFont(size=17, weight="bold"))
         if text:
-            self.label(text, color=MUTED)
+            self.label(t(text), color=MUTED)
         self.protocol("WM_DELETE_WINDOW", self.cancel)
         self.after(150, self._grab)
 
@@ -206,9 +215,13 @@ class _Dialog(ctk.CTkToplevel):
         return widget
 
     def finish_layout(self, primary: str, on_primary: Callable[[], None]) -> None:
-        ctk.CTkButton(self.buttons, text=t("Cancel"), width=100, fg_color="transparent", border_width=1,
-                      command=self.cancel).pack(side="right", padx=(8, 0))
-        self.primary = ctk.CTkButton(self.buttons, text=primary, width=140, command=on_primary)
+        # Kept as an attribute, not found again by its label: a dialog that renames this
+        # button used to search for the text "Cancel", which in German is "Abbrechen",
+        # so Later and Discard silently stayed "Abbrechen".
+        self.cancel_button = ctk.CTkButton(self.buttons, text=t("Cancel"), width=100,
+                                           fg_color="transparent", border_width=1, command=self.cancel)
+        self.cancel_button.pack(side="right", padx=(8, 0))
+        self.primary = ctk.CTkButton(self.buttons, text=t(primary), width=140, command=on_primary)
         self.primary.pack(side="right")
         self.bind("<Return>", lambda _e: on_primary())
         self.fit_to_screen()
@@ -238,10 +251,11 @@ class ClaudeLoginDialog(_Dialog):
                  on_done: Callable[[bool], None], reason: str = "") -> None:
         super().__init__(master, "Sign in to Claude", "Sign in to Claude",
                          (reason + "\n\n" if reason else "")
-                         + "Paste your Anthropic API key. It is stored in the system credential vault "
-                           "and reused until you sign out or it stops working.")
+                         + t("Paste your Anthropic API key. It is stored in the system credential vault "
+                             "and reused until you sign out or it stops working."))
         self.store, self.model, self.on_done = store, model, on_done
-        self.link("Create or copy a key at console.anthropic.com →", "https://console.anthropic.com/settings/keys")
+        self.link(t("Create or copy a key at console.anthropic.com →"),
+                  "https://console.anthropic.com/settings/keys")
         self.key = self.entry(t("API key"), secret=True, placeholder="sk-ant-…")
         self.finish_layout("Sign in", self.submit)
         self.after(200, self.key.focus_set)
@@ -250,13 +264,13 @@ class ClaudeLoginDialog(_Dialog):
         key = self.key.get().strip()
         self.busy(t("Verifying key…"))
         run_in_background(self, lambda: verify_claude_key(key, self.model), lambda name: self._saved(key, name),
-                          lambda exc: self.fail(str(exc)))
+                          lambda exc: self.fail(translated(exc)))
 
     def _saved(self, key: str, model_name: str) -> None:
         try:
             self.store.set_claude_key(key)
         except CredentialError as exc:
-            self.fail(str(exc))
+            self.fail(translated(exc))
             return
         self.status.configure(text=t("Signed in - {model} is available.", model=model_name), text_color=OK)
         self.after(600, lambda: self.close(True))
@@ -272,13 +286,13 @@ class GitLoginDialog(_Dialog):
     def __init__(self, master: Any, store: CredentialStore, host: str, verify_url: str,
                  author_name: str, author_email: str,
                  on_done: Callable[[bool, str, str], None], reason: str = "") -> None:
-        super().__init__(master, "Sign in to Git", f"Sign in to {host}",
+        super().__init__(master, "Sign in to Git", t("Sign in to {host}", host=host),
                          (reason + "\n\n" if reason else "")
-                         + "The token is stored in the system credential vault and sent only to this host.")
+                         + t("The token is stored in the system credential vault and sent only to this host."))
         self.store, self.host, self.verify_url, self.on_done = store, host, verify_url, on_done
         existing = store.get_git(host)
-        self.label(GIT_TOKEN_HELP.get(host, "Create a personal access token with read/write access to "
-                                            "repositories on this host."), color=MUTED)
+        self.label(t(GIT_TOKEN_HELP.get(host, "Create a personal access token with read/write access to "
+                                              "repositories on this host.")), color=MUTED)
         self.username = self.entry(t("Username"), existing.username if existing else DEFAULT_GIT_USERNAMES.get(host, ""))
         self.token = self.entry(t("Access token"), secret=True)
         self.name = self.entry(t("Commit author name"), author_name)
@@ -298,20 +312,20 @@ class GitLoginDialog(_Dialog):
             return
         credential = GitCredential(self.host, username, token)
         can_verify = bool(self.verify_url) and host_of(self.verify_url) == self.host
-        self.busy("Checking repository access…" if can_verify else "Saving…")
+        self.busy(t("Checking repository access…") if can_verify else t("Saving…"))
 
         def work() -> None:
             if can_verify:
                 verify_git_access(self.verify_url, credential)
 
         run_in_background(self, work, lambda _v: self._saved(credential, name, email),
-                          lambda exc: self.fail(str(exc)))
+                          lambda exc: self.fail(translated(exc)))
 
     def _saved(self, credential: GitCredential, name: str, email: str) -> None:
         try:
             self.store.set_git(credential)
         except CredentialError as exc:
-            self.fail(str(exc))
+            self.fail(translated(exc))
             return
         self._result = (name, email)
         self.status.configure(text=t("Signed in."), text_color=OK)
@@ -330,7 +344,7 @@ class OpenAlexKeyDialog(_Dialog):
                          "Literature search works without a key, but a free key raises the daily "
                          "OpenAlex budget 10×.")
         self.store, self.on_done = store, on_done
-        self.link("Get a free key at openalex.org/settings/api →", "https://openalex.org/settings/api")
+        self.link(t("Get a free key at openalex.org/settings/api →"), "https://openalex.org/settings/api")
         self.key = self.entry(t("API key"), secret=True)
         self.finish_layout("Save", self.submit)
 
@@ -338,13 +352,13 @@ class OpenAlexKeyDialog(_Dialog):
         key = self.key.get().strip()
         self.busy(t("Verifying key…"))
         run_in_background(self, lambda: verify_openalex_key(key), lambda _v: self._saved(key),
-                          lambda exc: self.fail(str(exc)))
+                          lambda exc: self.fail(translated(exc)))
 
     def _saved(self, key: str) -> None:
         try:
             self.store.set_openalex_key(key)
         except CredentialError as exc:
-            self.fail(str(exc))
+            self.fail(translated(exc))
             return
         self.close(True)
 
@@ -366,7 +380,7 @@ class PaperDialog(_Dialog):
         self.old_name = spec.name if spec else None
         self.editing = editing
         self.other_names, self.papers_dir, self.on_save = other_names, papers_dir, on_save
-        self.name = self.entry(t("Paper name"), spec.name if spec else "", placeholder="e.g. GNN folding paper")
+        self.name = self.entry(t("Paper name"), spec.name if spec else "", placeholder=t("e.g. GNN folding paper"))
         self.url = self.entry(t("Overleaf or Git URL (optional)"), spec.remote_url if spec else "",
                               placeholder="https://www.overleaf.com/project/<id>  or  https://github.com/<you>/<repo>")
         self.label(t("Local folder"))
@@ -379,7 +393,7 @@ class PaperDialog(_Dialog):
             self.path.insert(0, spec.local_path)
         ctk.CTkButton(row, text="…", width=32, command=self._browse).pack(side="left", padx=(4, 0))
         self.branch = self.entry(t("Branch (optional)"), spec.branch if spec else "",
-                                 placeholder="blank = the repository's default branch (Overleaf: main)")
+                                 placeholder=t("blank = the repository's default branch (Overleaf: main)"))
 
         self.create = ctk.CTkCheckBox(self.body, text=t("Set up the folder structure for a new paper"),
                                       command=self._toggle_create)
@@ -445,7 +459,9 @@ class PaperDialog(_Dialog):
         patterns += [f for f in found if f not in patterns]
         self.read_only.delete(0, "end")
         self.read_only.insert(0, ", ".join(patterns))
-        self.status.configure(text="Detected: " + "; ".join(f"{k} ({v})" for k, v in found.items()), text_color=OK)
+        self.status.configure(text=t("Detected: {names}",
+                                     names="; ".join(f"{k} ({v})" for k, v in found.items())),
+                              text_color=OK)
 
     def submit(self) -> None:
         name = self.name.get().strip()

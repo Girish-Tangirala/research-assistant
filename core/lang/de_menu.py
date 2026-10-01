@@ -151,4 +151,14 @@ CATALOGUE: dict[str, str] = {
     "Back up data": "Daten sichern",
     "Copy source location": "Quellposition kopieren",
     "Nothing to do here": "Hier gibt es nichts zu tun",
+
+    # -- Options menu (the check buttons come from gui/app.py as data) ---- #
+    "Send to Overleaf right after each approval (off: use the Sync button)":
+        "Direkt nach jeder Genehmigung an Overleaf senden (aus: die Schaltfläche "
+        "'Synchronisieren' verwenden)",
+    "Ask before sending anything to Overleaf":
+        "Vor dem Senden an Overleaf nachfragen",
+    "Compile before commit": "Vor dem Übernehmen kompilieren",
+    "Preview changes before approval": "Änderungen vor der Genehmigung in der Vorschau zeigen",
+    "Use Claude web search": "Claude-Websuche verwenden",
 }

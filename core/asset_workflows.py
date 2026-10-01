@@ -269,7 +269,7 @@ class AddReferencesWorkflow(BaseWorkflow):
             raise AgentError("Enter at least one DOI, arXiv ID or title, or choose a .bib file.")
         for f in files:
             if not f.is_file() or f.suffix.lower() != ".bib":
-                raise AgentError(f"Not a .bib file: {f}")
+                raise AgentError("Not a .bib file: {file}", file=f)
 
         engine.set_state(WorkflowState.SYNCING)
         paper.git.sync()

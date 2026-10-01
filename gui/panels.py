@@ -15,7 +15,7 @@ import customtkinter as ctk
 
 from core.events import EventKind
 from gui.task_forms import FORMS, Form, FormContext
-from core.i18n import Choices, t
+from core.i18n import Choices, t, translated
 
 LOG_COLORS = {
     EventKind.INFO: "#c9d1d9", EventKind.STATE: "#d2a8ff", EventKind.THOUGHT: "#8b949e",
@@ -126,7 +126,7 @@ class TaskPanel(ctk.CTkFrame):
         try:
             params = self.forms[name].params()
         except ValueError as exc:
-            self.append(EventKind.ERROR, str(exc))
+            self.append(EventKind.ERROR, translated(exc))
             return
         self._run(name, params)
 

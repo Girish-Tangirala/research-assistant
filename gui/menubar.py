@@ -92,7 +92,9 @@ class AppMenuBar:
 
         options_menu = tk.Menu(self.bar, tearoff=False)
         for label, var in options:
-            options_menu.add_checkbutton(label=label, variable=var, command=actions.options_changed)
+            # The labels come in as English from gui/app.py; translated here, once.
+            options_menu.add_checkbutton(label=t(label), variable=var,
+                                         command=actions.options_changed)
         if actions.todo_repo is not None:
             options_menu.add_separator()
             options_menu.add_command(label=t("Shared to-do list\u2026"), command=actions.todo_repo)

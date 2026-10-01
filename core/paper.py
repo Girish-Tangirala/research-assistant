@@ -11,9 +11,10 @@ from core.events import ProposedChange
 from core.git_manager import GitManager
 from core.latex_parser import find_main_tex
 from core.protection import ProtectionPolicy, read_only_message
+from core.user_errors import UserMessage
 
 
-class ToolError(RuntimeError):
+class ToolError(UserMessage, RuntimeError):
     """Recoverable tool failure - reported back to the model with is_error."""
 
 
@@ -47,7 +48,7 @@ class PaperHandle:
     def main_tex(self) -> Path:
         main = find_main_tex(self.root)
         if main is None:
-            raise ToolError(f"No main .tex file (with \\documentclass) in {self.root}")
+            raise ToolError("No main .tex file (with \\documentclass) in {folder}", folder=self.root)
         return main
 
     def resolve(self, rel_path: str | None, for_write: bool = False) -> Path:
@@ -59,7 +60,7 @@ class PaperHandle:
         """
         path = self.main_tex() if not rel_path else (self.root / rel_path).resolve()
         if path != self.root and self.root not in path.parents:
-            raise ToolError(f"Path escapes the repository: {rel_path}")
+            raise ToolError("Path escapes the repository: {file}", file=rel_path)
         if ".git" in path.relative_to(self.root).parts:
             raise ToolError("Access to .git is not allowed")
         if for_write:
@@ -116,13 +117,15 @@ def apply_changes(changes: list[ProposedChange], applied: AppliedChanges) -> Non
         existed = target.exists()
         if change.source_file is not None:
             if existed and not change.replaces:
-                raise ChangeConflictError(f"{change.rel_path} already exists - choose another name.")
+                raise ChangeConflictError("{file} already exists - choose another name.",
+                                          file=change.rel_path)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(change.source_file, target)
         else:
             current = read_text(target) if existed else ""
             if current != change.original:
-                raise ChangeConflictError(f"{change.rel_path} changed on disk since it was read - aborting.")
+                raise ChangeConflictError("{file} changed on disk since it was read - aborting.",
+                                          file=change.rel_path)
             target.parent.mkdir(parents=True, exist_ok=True)
             write_text_preserving_eol(target, change.proposed)
         if not existed:
@@ -137,9 +140,10 @@ def _move_files(change: ProposedChange, applied: AppliedChanges) -> None:
         if source_rel == target_rel:
             continue
         if not source.is_file():
-            raise ChangeConflictError(f"{source_rel} is no longer there - sync the paper and try again.")
+            raise ChangeConflictError("{file} is no longer there - sync the paper and try again.",
+                                      file=source_rel)
         if target.exists():
-            raise ChangeConflictError(f"{target_rel} already exists - aborting.")
+            raise ChangeConflictError("{file} already exists - aborting.", file=target_rel)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(source), str(target))
         applied.moved.append((source_rel, target_rel))

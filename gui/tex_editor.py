@@ -24,7 +24,7 @@ from core.latex_parser import find_main_tex
 from core.paper import read_text, write_text_preserving_eol
 from gui.dialogs import run_in_background
 from gui.tex_highlight import CodeText
-from core.i18n import t
+from core.i18n import t, translated
 
 EDITABLE_SUFFIXES = {".tex", ".bib", ".cls", ".sty", ".bst", ".bbx", ".cbx", ".md", ".txt"}
 NO_FILE = "— no file —"
@@ -171,7 +171,8 @@ class TexEditor(ctk.CTkFrame):
     def _confirm_leave(self) -> bool:
         if not self.dirty:
             return True
-        answer = messagebox.askyesnocancel("Unsaved changes", f"Save your changes to {self.rel}?", parent=self)
+        answer = messagebox.askyesnocancel(t("Unsaved changes"),
+                                   t("Save your changes to {file}?", file=self.rel), parent=self)
         if answer is None:
             return False
         if answer:
@@ -247,8 +248,10 @@ class TexEditor(ctk.CTkFrame):
 
         def failed(exc: Exception) -> None:
             self._saving = False
-            self._show_status(f"Saved {rel}, but not committed: {exc}", WARN)
-            self.ctx.notify(EventKind.WARNING, t("{file} was saved but not committed: {problem}", file=rel, problem=exc))
+            self._show_status(t("Saved {file}, but not committed: {problem}",
+                                file=rel, problem=translated(exc)), WARN)
+            self.ctx.notify(EventKind.WARNING, t("{file} was saved but not committed: {problem}", file=rel,
+                                              problem=translated(exc)))
             if recompile:
                 self.ctx.recompile()
 

@@ -23,7 +23,7 @@ from core.workflows import OrganizeWorkflow, PublishWorkflow
 from core.protection import ProtectionPolicy
 from gui.dialogs import PaperDialog, run_in_background
 from gui.panels import open_path
-from core.i18n import t
+from core.i18n import t, translated
 
 NO_PAPER = "— add a paper —"
 
@@ -230,7 +230,7 @@ class PapersMixin:
             self.recompile_preview(quiet=True)
 
         run_in_background(self, work, done, lambda exc: self.panel.append(
-            EventKind.ERROR, t("Could not set up the paper folder: {problem}", problem=exc)))
+            EventKind.ERROR, t("Could not set up the paper folder: {problem}", problem=translated(exc))))
 
     def _clone_new_paper(self, spec: PaperSpec, title: str | None) -> None:
         """Clone a newly added linked paper; add the folder structure only if the project has no .tex yet."""
@@ -269,7 +269,7 @@ class PapersMixin:
             self.recompile_preview(quiet=True)
 
         run_in_background(self, work, done, lambda exc: self.panel.append(
-            EventKind.ERROR, t("Could not clone the paper: {problem}", problem=exc)))
+            EventKind.ERROR, t("Could not clone the paper: {problem}", problem=translated(exc))))
 
     @staticmethod
     def _unsorted_files(root: Path) -> list[str]:

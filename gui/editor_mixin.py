@@ -150,8 +150,9 @@ class EditorMixin:
     def _editor_may_close(self) -> bool:
         if not self.editor.has_unsaved():
             return True
-        answer = messagebox.askyesnocancel("Unsaved changes", f"Save your changes to {self.editor.rel} before "
-                                           "closing?", parent=self)
+        answer = messagebox.askyesnocancel(
+            t("Unsaved changes"),
+            t("Save your changes to {file} before closing?", file=self.editor.rel), parent=self)
         if answer:
             self.editor.save(recompile=False, blocking=True)
         return answer is not None

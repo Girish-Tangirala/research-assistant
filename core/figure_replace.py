@@ -99,12 +99,13 @@ def run_replace(workflow: AddFiguresWorkflow) -> WorkflowResult:
     engine.refresh_protection()
     path = paper.resolve(rel)
     if not path.is_file():
-        raise AgentError(f"{rel} no longer exists - sync the paper and pick the figure again.")
+        raise AgentError("{file} no longer exists - sync the paper and pick the figure again.", file=rel)
     tex = read_text(path)
     figure = find_figure(tex, rel, label, graphic, int(params.get("replace_line") or 0))
     if figure is None:
-        raise AgentError(f"The figure ({label or graphic}) was not found in {rel} - the paper may have changed. "
-                         "Recompile the preview and click the figure again.")
+        raise AgentError("The figure ({figure}) was not found in {file} - the paper may have changed. "
+                         "Recompile the preview and click the figure again.",
+                         figure=label or graphic, file=rel)
     main = paper.main_tex()
     main_rel = paper.rel(main)
     main_src = tex if main == path else read_text(main)

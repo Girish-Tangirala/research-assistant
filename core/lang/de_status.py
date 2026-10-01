@@ -159,4 +159,13 @@ CATALOGUE: dict[str, str] = {
         "Die Sprache ändert sich beim Neustart der Anwendung.\n\nJetzt neu starten?",
     "The language will change the next time you start the app.":
         "Die Sprache ändert sich beim nächsten Start der Anwendung.",
+
+    # -- Accounts menu: the data backup line ------------------------------- #
+    "Data backup: not set up (optional)": "Datensicherung: nicht eingerichtet (optional)",
+    "Data backup: OneDrive folder {folder}": "Datensicherung: OneDrive-Ordner {folder}",
+    "Data backup: signed in as {account}": "Datensicherung: angemeldet als {account}",
+    "Data backup: signed in": "Datensicherung: angemeldet",
+    "Data backup: set up, not signed in": "Datensicherung: eingerichtet, nicht angemeldet",
+    "Change settings…": "Einstellungen ändern…",
+    "Set up…": "Einrichten…",
 }

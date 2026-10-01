@@ -52,7 +52,7 @@ from gui.preview_pane import PreviewMixin
 from gui.sharepoint import SharePointMixin
 from gui.todo_panel import TodoContext
 from gui.todo_setup import TodoSetupMixin
-from core.i18n import LANGUAGES, set_language, t
+from core.i18n import LANGUAGES, current_language, set_language, t, translated
 
 logger = logging.getLogger("research_agent")
 MUTED = "#8b949e"
@@ -247,7 +247,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         try:
             subprocess.Popen(command, cwd=str(Path(sys.argv[0]).resolve().parent), close_fds=True)
         except OSError as exc:      # could not relaunch: say so rather than closing on a dead end
-            messagebox.showwarning(t("Restart to change the language"), str(exc), parent=self)
+            messagebox.showwarning(t("Restart to change the language"), translated(exc), parent=self)
             return
         self._on_close()
 
@@ -265,11 +265,16 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
     def _open_user_guide(self) -> None:
         # Next to the code when run from source; inside the bundle in the packaged app.
         base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
-        guide = base / "docs" / "USER_GUIDE.md"
-        if guide.exists():
-            open_path(guide)
-        else:
-            self.panel.append(EventKind.WARNING, t("The user guide was not found at {path}.", path=guide))
+        # A German interface opens the German guide, and falls back to the English one.
+        names = ["INSTALLATION_DE.md", "USER_GUIDE.md"] if current_language() == "de" \
+            else ["USER_GUIDE.md"]
+        for name in names:
+            guide = base / "docs" / name
+            if guide.exists():
+                open_path(guide)
+                return
+        self.panel.append(EventKind.WARNING,
+                          t("The user guide was not found at {path}.", path=base / "docs"))
 
     def _about(self) -> None:
         compiler = self.config_.latex
@@ -370,13 +375,13 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
             emit(EventKind.WARNING, "Workflow cancelled. No unapproved changes were written.")
         except LLMAuthError as exc:
             emit(EventKind.STATE, WorkflowState.FAILED.value)
-            emit(EventKind.AUTH_REQUIRED, str(exc), service="claude")
+            emit(EventKind.AUTH_REQUIRED, translated(exc), service="claude")
         except GitAuthError as exc:
             emit(EventKind.STATE, WorkflowState.FAILED.value)
-            emit(EventKind.AUTH_REQUIRED, str(exc), service="git", host=exc.host)
+            emit(EventKind.AUTH_REQUIRED, translated(exc), service="git", host=exc.host)
         except Exception as exc:  # noqa: BLE001 - worker boundary: report everything to the user
             emit(EventKind.STATE, WorkflowState.FAILED.value)
-            emit(EventKind.ERROR, f"{type(exc).__name__}: {exc}", failed=True)
+            emit(EventKind.ERROR, f"{type(exc).__name__}: {translated(exc)}", failed=True)
             logger.error("Workflow failed\n%s", traceback.format_exc())
         finally:
             emit(EventKind.FINISHED, "")
@@ -409,7 +414,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
             self.confirm_push(event.data["request_id"], event.message, event.data)
         elif kind == EventKind.AUTH_REQUIRED:
             self.panel.append(EventKind.ERROR, event.message)
-            reason = "Your saved credentials were rejected. Sign in again, then re-run the workflow."
+            reason = t("Your saved credentials were rejected. Sign in again, then re-run the workflow.")
             if event.data.get("service") == "claude":
                 self._ensure_claude(lambda: None, required=False, reason=reason)
             else:
@@ -428,8 +433,9 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
             # A task that stopped must not look like "nothing happened": say so where it can't be missed.
             self.panel.append(kind, event.message)
             detail = event.message.split(": ", 1)[-1]
-            messagebox.showerror(t("The task did not finish"), detail[:1500] + "\n\nAnything it had not finished was "
-                                 "undone. The full details are in the Live Log (Agent tasks).", parent=self)
+            messagebox.showerror(t("The task did not finish"), detail[:1500] + "\n\n"
+                                 + t("Anything it had not finished was undone. The full details are in the "
+                                     "Live Log (Agent tasks)."), parent=self)
         else:
             self.panel.append(kind, event.message)
         if kind != EventKind.LLM_TEXT and kind != EventKind.THOUGHT and event.message:
@@ -461,9 +467,9 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
 
     def _todo_error(self, exc: Exception) -> None:
         if isinstance(exc, GitAuthError):
-            self.bus.emit(EventKind.AUTH_REQUIRED, str(exc), service="git", host=exc.host)
+            self.bus.emit(EventKind.AUTH_REQUIRED, translated(exc), service="git", host=exc.host)
         else:
-            self.panel.append(EventKind.ERROR, t("To-do list: {problem}", problem=exc))
+            self.panel.append(EventKind.ERROR, t("To-do list: {problem}", problem=translated(exc)))
             logger.error("To-do operation failed: %s", exc)
 
     # ------------------------------------------------------------------ #
@@ -479,7 +485,8 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
         try:
             self.app_state.save(self.config_.settings_file)
         except OSError as exc:
-            self.panel.append(EventKind.WARNING, t("Could not save settings: {problem}", problem=exc))
+            self.panel.append(EventKind.WARNING,
+                              t("Could not save settings: {problem}", problem=translated(exc)))
 
     def _on_close(self) -> None:
         if not self._editor_may_close():

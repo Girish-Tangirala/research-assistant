@@ -17,7 +17,7 @@ class RemoteSyncMixin:
 
     def fetch(self) -> None:
         if not self._has_remote():
-            raise GitOperationError(f"No remote named {self.settings.remote_name!r}")
+            raise GitOperationError("No remote named '{remote}'", remote=self.settings.remote_name)
         try:
             with self.repo.git.custom_environment(**self._auth_env()):
                 self.repo.git.fetch(self.settings.remote_name)
@@ -88,10 +88,11 @@ class RemoteSyncMixin:
         if pulled:
             if pushed and not self._shares_history(base):
                 raise GitOperationError(
-                    f"This paper and the {self.host or 'remote'} project were started separately, so they have "
-                    "nothing in common - merging them automatically would be guesswork. Nothing was sent.\n"
-                    "Either link the paper to a brand-new (empty) Overleaf project, or add this paper again "
-                    "from the Overleaf project link and copy your files into that folder.")
+                    "This paper and the {host} project were started separately, so they have nothing in "
+                    "common - merging them automatically would be guesswork. Nothing was sent.\n"
+                    "Either link the paper to a brand-new (empty) Overleaf project, or add this paper "
+                    "again from the Overleaf project link and copy your files into that folder.",
+                    host=self.host or "remote")
             self._log(f"{pulled} change(s) came from {self.host or 'the remote'} - replaying your commits on top")
             identity = {"GIT_COMMITTER_NAME": self.settings.author_name,
                         "GIT_COMMITTER_EMAIL": self.settings.author_email}

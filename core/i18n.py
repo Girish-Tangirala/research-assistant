@@ -32,11 +32,17 @@ _listeners: list[Callable[[str], None]] = []
 
 
 def load(code: str) -> dict[str, str]:
-    """The catalogue for ``code`` (empty for English, which is the source text)."""
+    """The catalogue for ``code`` (empty for English, which is the source text).
+
+    A **copy**: the live catalogue must not be the module's own dict, or anything that
+    writes an entry edits the source of truth for the rest of the process. A test that
+    poked a broken translation in to check the fallback left it there, and the next test
+    to read ``german.CATALOGUE`` saw the damage.
+    """
     if code == "de":
         from core.lang import german
 
-        return german.CATALOGUE
+        return dict(german.CATALOGUE)
     return {}
 
 
@@ -63,6 +69,20 @@ def t(text: str, **fields: object) -> str:
         except (KeyError, IndexError, ValueError):
             return text.format(**fields)      # a broken translation must not break the app
     return translated
+
+
+def translated(exc: BaseException) -> str:
+    """An error's sentence in the interface language.
+
+    ``core`` raises English templates (see :mod:`core.user_errors`), so a dialog shows
+    ``translated(exc)`` while ``str(exc)`` - the log, the reports, Git's history -
+    stays English. Anything else, including an error from a library, is shown as it is.
+    """
+    from core.user_errors import UserMessage
+
+    if isinstance(exc, UserMessage) and exc.template:
+        return t(exc.template, **exc.fields)
+    return str(exc)
 
 
 class Choices:

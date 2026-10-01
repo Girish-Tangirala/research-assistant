@@ -35,7 +35,7 @@ from core.sharepoint_sync import (
 )
 from gui.dialogs import MUTED, OK, _Dialog, run_in_background
 from gui.menubar import AccountSection
-from core.i18n import t
+from core.i18n import t, translated
 
 class SharePointSettingsDialog(_Dialog):
     """Which OneDrive folder the backup copies into, and what it takes with it."""
@@ -107,7 +107,7 @@ class SharePointSignInDialog(_Dialog):
         self.primary.configure(state="disabled")
         self._device: DeviceCode | None = None
         run_in_background(self, lambda: start_device_code(settings.client_id, settings.tenant),
-                          self._show_code, lambda exc: self.fail(str(exc)))
+                          self._show_code, lambda exc: self.fail(translated(exc)))
 
     def _show_code(self, device: DeviceCode) -> None:
         self._device = device
@@ -117,7 +117,7 @@ class SharePointSignInDialog(_Dialog):
         self.primary.configure(state="normal")
         self.status.configure(text=t("Waiting for you to finish signing in…"), text_color=MUTED)
         self._open_page()
-        run_in_background(self, self._wait, self._signed_in, lambda exc: self.fail(str(exc)))
+        run_in_background(self, self._wait, self._signed_in, lambda exc: self.fail(translated(exc)))
 
     def _open_page(self) -> None:
         if self._device is not None:
@@ -138,7 +138,7 @@ class SharePointSignInDialog(_Dialog):
         try:
             self.store.set_sharepoint_token(token)
         except CredentialError as exc:
-            self.fail(str(exc))
+            self.fail(translated(exc))
             return
         self.account = account
         self.status.configure(text=t("Signed in as {account}.", account=account), text_color=OK)
@@ -163,7 +163,7 @@ class BackupProgressWindow(ctk.CTkToplevel):
 
     def __init__(self, master: Any, paper: str, files: int, total_bytes: int, handing_off: bool) -> None:
         super().__init__(master)
-        self.title("Backing up data")
+        self.title(t("Backing up data"))
         self.resizable(False, False)
         self.transient(master)
         self.cancelled = threading.Event()
@@ -278,17 +278,20 @@ class SharePointMixin:
         settings = self.app_state.sharepoint
         signed_in = bool(self._safe(self.store.get_sharepoint_token))
         if not settings.configured:
-            status = "Data backup: not set up (optional)"
+            status = t("Data backup: not set up (optional)")
         elif not settings.uses_graph:
-            status = f"Data backup: OneDrive folder {Path(settings.local_library).name}"
+            status = t("Data backup: OneDrive folder {folder}", folder=Path(settings.local_library).name)
+        elif signed_in and settings.account:
+            status = t("Data backup: signed in as {account}", account=settings.account)
         elif signed_in:
-            status = f"Data backup: signed in{f' as {settings.account}' if settings.account else ''}"
+            status = t("Data backup: signed in")
         else:
-            status = "Data backup: set up, not signed in"
+            status = t("Data backup: set up, not signed in")
         return AccountSection(status, [
-            ("Change settings…" if settings.configured else "Set up…", self._sharepoint_settings, True),
-            ("Sign in…", self._sharepoint_sign_in, settings.configured and settings.uses_graph),
-            ("Sign out", self._sharepoint_sign_out, signed_in)])
+            (t("Change settings…") if settings.configured else t("Set up…"),
+             self._sharepoint_settings, True),
+            (t("Sign in…"), self._sharepoint_sign_in, settings.configured and settings.uses_graph),
+            (t("Sign out"), self._sharepoint_sign_out, signed_in)])
 
     # -- the backup ------------------------------------------------------ #
     def _sharepoint_client(self) -> Any:
@@ -419,10 +422,10 @@ class SharePointMixin:
     def _sharepoint_failed(self, exc: Exception) -> None:
         self._sharepoint_busy = False
         if isinstance(exc, SharePointAuthError):
-            self.panel.append(EventKind.ERROR, str(exc))
+            self.panel.append(EventKind.ERROR, translated(exc))
             self._sharepoint_sign_in()
         elif isinstance(exc, SharePointError):
-            self.panel.append(EventKind.ERROR, t("Backup: {problem}", problem=exc))
+            self.panel.append(EventKind.ERROR, t("Backup: {problem}", problem=translated(exc)))
         else:
             self.panel.append(EventKind.ERROR, t("Backup failed: {kind}: {problem}",
-                                             kind=type(exc).__name__, problem=exc))
+                                             kind=type(exc).__name__, problem=translated(exc)))

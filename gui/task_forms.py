@@ -207,7 +207,7 @@ class LiteratureForm(Form):
         self._group = self.search_widgets = []
         self.textbox("focus", t("Focus (optional) - sub-questions, methods, exclusions"), height=55)
         self.entry("max_papers", t("Approx. number of papers"), "20", width=120)
-        self.entry("year_from", t("Published from (year, optional)"), placeholder="e.g. 2018", width=120)
+        self.entry("year_from", t("Published from (year, optional)"), placeholder=t("e.g. 2018"), width=120)
         self.label(t("Searches OpenAlex, Crossref and arXiv (plus Claude web search if enabled). Read-only: "
                    "writes a review with a link for every paper,\na verification table and a .bib of new "
                    "candidates."), muted=True)

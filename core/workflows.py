@@ -90,7 +90,7 @@ class BaseWorkflow:
         for candidate in candidates:
             if find_section(read_text(candidate), title) is not None:
                 return candidate
-        raise AgentError(f"Section {title!r} not found in any .tex file of the paper")
+        raise AgentError("Section '{section}' not found in any .tex file of the paper", section=title)
 
     def log(self, message: str, kind: EventKind = EventKind.INFO, **data: Any) -> None:
         self.engine.log(message, kind, **data)
@@ -424,7 +424,8 @@ class SafeEditWorkflow(BaseWorkflow):
         tex = read_text(target)
         section = find_section(tex, title)
         if section is None:
-            raise AgentError(f"Section {title!r} not found in {paper.rel(target)}")
+            raise AgentError("Section '{section}' not found in {file}",
+                             section=title, file=paper.rel(target))
         body = section.body(tex)
         protected = protect(body)
         self.log(f"Editing '{section.title}' in {paper.rel(target)}: "

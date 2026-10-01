@@ -73,7 +73,7 @@ class GitManager(RemoteSyncMixin):
             try:
                 self._repo = Repo(self.local_path)
             except (InvalidGitRepositoryError, NoSuchPathError) as exc:
-                raise GitOperationError(f"{self.local_path} is not a Git repository") from exc
+                raise GitOperationError("{folder} is not a Git repository", folder=self.local_path) from exc
         return self._repo
 
     def _has_remote(self) -> bool:
@@ -145,8 +145,9 @@ class GitManager(RemoteSyncMixin):
                 return self.repo
             except GitOperationError as exc:
                 raise GitOperationError(
-                    f"{self.local_path} contains a .git folder that is not a working repository. "
-                    "Delete that folder (or choose another one) and try again.") from exc
+                    "{folder} contains a .git folder that is not a working repository. "
+                    "Delete that folder (or choose another one) and try again.",
+                    folder=self.local_path) from exc
         self.local_path.mkdir(parents=True, exist_ok=True)
         try:
             self._repo = Repo.init(self.local_path, initial_branch=self.branch or branch)
@@ -196,10 +197,11 @@ class GitManager(RemoteSyncMixin):
             return repo
         if not self.remote_url:
             raise GitOperationError(
-                f"{self.local_path} is not a Git repository and no remote URL was provided"
-            )
+                "{folder} is not a Git repository and no remote URL was provided",
+                folder=self.local_path)
         if self.local_path.exists() and any(self.local_path.iterdir()):
-            raise GitOperationError(f"Refusing to clone into non-empty directory {self.local_path}")
+            raise GitOperationError("Refusing to clone into non-empty directory {folder}",
+                                    folder=self.local_path)
         self._log(f"Cloning {self.redact(self.remote_url)} -> {self.local_path}")
         try:
             kwargs = {"branch": self.branch} if self.branch else {}
@@ -240,8 +242,8 @@ class GitManager(RemoteSyncMixin):
             return repo.head.commit.hexsha[:10] if repo.head.is_valid() else ""
         if self.is_dirty():
             raise GitOperationError(
-                f"{self.local_path} has uncommitted changes; commit or stash them before syncing"
-            )
+                "{folder} has uncommitted changes; commit or stash them before syncing",
+                folder=self.local_path)
         try:
             if self.current_branch() != target:
                 self._log(f"Checking out {target}")
@@ -294,7 +296,7 @@ class GitManager(RemoteSyncMixin):
 
     def push(self, branch: str) -> None:
         if not self._has_remote():
-            raise GitOperationError(f"No remote named {self.settings.remote_name!r}")
+            raise GitOperationError("No remote named '{remote}'", remote=self.settings.remote_name)
         self._log(f"Pushing {branch} -> {self.settings.remote_name}")
         try:
             with self.repo.git.custom_environment(**self._auth_env()):
@@ -362,9 +364,10 @@ class GitManager(RemoteSyncMixin):
                     finally:
                         git.checkout(base)
                     raise GitOperationError(
-                        f"Your approved changes conflict with edits made on the remote since the last sync. "
-                        f"They are kept on local branch '{feature_branch}'; sync the paper and run the "
-                        f"workflow again.\n{self.redact(str(exc.stderr or exc).strip())}") from exc
+                        "Your approved changes conflict with edits made on the remote since the last "
+                        "sync. They are kept on local branch '{branch}'; sync the paper and run the "
+                        "workflow again.\n{detail}", branch=feature_branch,
+                        detail=self.redact(str(exc.stderr or exc).strip())) from exc
                 git.checkout(base)
             git.merge("--ff-only", feature_branch)
         except GitCommandError as exc:

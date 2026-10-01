@@ -29,7 +29,7 @@ from core.synctex import find_synctex_tool
 from core.workflows import CitationAuditWorkflow, SafeEditWorkflow
 from gui.editor_mixin import AGENT_MODE, TODO_MODE
 from gui.panels import open_path
-from core.i18n import t
+from core.i18n import t, translated
 
 EDIT_TAB = SafeEditWorkflow.name
 FIGURES_TAB = AddFiguresWorkflow.name
@@ -71,10 +71,12 @@ class PdfLinkMixin:
             try:
                 target = target_for_click(pdf, page, x, y, source_root, repo, tool)
             except ClickLookupError as exc:
-                self.bus.emit(EventKind.PREVIEW, "", click_error=str(exc))
+                self.bus.emit(EventKind.PREVIEW, "", click_error=translated(exc))
                 return
             except Exception as exc:  # noqa: BLE001 - shown in the status line
-                self.bus.emit(EventKind.PREVIEW, "", click_error=f"Could not map the click: {exc}")
+                self.bus.emit(EventKind.PREVIEW, "",
+                              click_error=t("Could not map the click: {problem}",
+                                            problem=translated(exc)))
                 return
             self.bus.emit(EventKind.PREVIEW, "", click=target, menu=(x_root, y_root) if context_menu else None)
 

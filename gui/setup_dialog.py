@@ -21,7 +21,7 @@ from core.dependencies import (
     missing_tools,
 )
 from gui.dialogs import MUTED, OK, _Dialog
-from core.i18n import t
+from core.i18n import t, translated
 
 WARN = "#e3b341"
 LABELS = {"git": "Git (history of your papers, talking to Overleaf)",
@@ -88,8 +88,8 @@ class SetupDialog(_Dialog):
                 install(path)
                 self._messages[tool] = (t("installed ✓"), OK)
             except (DependencyError, OSError, subprocess.SubprocessError) as exc:
-                errors.append(t("{tool}: {problem}", tool=tool, problem=exc))
-                self._messages[tool] = (f"not installed - {exc}", WARN)
+                errors.append(t("{tool}: {problem}", tool=tool, problem=translated(exc)))
+                self._messages[tool] = (t("not installed - {problem}", problem=translated(exc)), WARN)
             if self._cancel_requested:
                 break
         self._finished = (not errors and not self._cancel_requested, errors)
@@ -123,7 +123,7 @@ class SetupDialog(_Dialog):
         else:
             still = missing_tools()
             self.fail("Not everything could be installed:\n" + "\n".join(errors) if errors else "Cancelled.")
-            self.primary.configure(text="Try again" if still else "Restart now",
+            self.primary.configure(text=t("Try again") if still else t("Restart now"),
                                    command=self._retry if still else self._restart)
             self.missing = still
 
