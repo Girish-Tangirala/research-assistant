@@ -151,6 +151,8 @@ class LiteratureReviewWorkflow(BaseWorkflow):
         focus: Optional extra guidance (sub-questions, methods, exclusions).
         max_papers: Approximate number of papers to include (default 20).
         year_from: Optional earliest publication year.
+        mode: ``"summarise"`` reads papers the user already has instead of
+            searching (see :mod:`core.literature_summary` for its parameters).
     """
 
     name = "Literature Review"
@@ -169,6 +171,10 @@ class LiteratureReviewWorkflow(BaseWorkflow):
         return "\n\n".join(parts) or "(No abstract or introduction found - use read_tex_file.)"
 
     def run(self) -> WorkflowResult:
+        if self.params.get("mode") == "summarise":
+            from core.literature_summary import run_summary
+
+            return run_summary(self)
         engine = self.engine
         paper = engine.paper
         engine.set_state(WorkflowState.SYNCING)

@@ -26,7 +26,7 @@ The window opens maximised, in three columns:
 | Workflow | What it does | Changes your paper? |
 |---|---|---|
 | **Edit Text** | Copy-edits one section. Math, citations, labels and structure are protected by placeholders and checked afterwards. | After approval |
-| **Literature Review** | Searches OpenAlex, Crossref and arXiv (plus Claude web search if enabled) and writes a themed review with a link for every paper. Adds a verification table and a `.bib` of new candidates. | No |
+| **Literature Review** | Two modes. *Search for papers* searches OpenAlex, Crossref and arXiv (plus Claude web search if enabled) and writes a themed review with a link for every paper, a verification table and a `.bib` of new candidates. *Summarise papers I have* reads papers you already have - PDFs on your computer, or DOIs/arXiv IDs/links - and summarises each one. | No |
 | **Add Figures** | Copies images from any folder into the paper's figures folder and inserts `figure` blocks with labels. Claude can draft each caption by looking at the image and add a "Figure~\ref{…}" sentence. | After approval |
 | **Add References** | Turns DOIs, arXiv IDs or links, titles, or `.bib` files from your computer into BibTeX entries, using data from OpenAlex, Crossref or arXiv; duplicates are skipped. Optionally cites them in a section. | After approval |
 | **Results Figures & Tables** | Reads your own training/inference results (CSV, Excel, a Keras/PyTorch history JSON, a scikit-learn classification report, a confusion matrix) from a file or a whole folder and inserts a training curve, a comparison bar chart, a confusion-matrix heat map or a results table as `pgfplots`/`booktabs` code. Claude chooses the columns and writes the caption; every number is read from the file. | After approval |
@@ -68,6 +68,25 @@ them into the paper.
 - **Limits:** at most 8 series in one chart, 24 bar groups, 30 classes in a matrix and 5000 rows per file;
   past those the task asks you for a table instead. Files over 25 MB are refused - export the summary you
   want to plot.
+
+### Summarising a paper you already have
+
+The second mode of **Literature Review** takes papers you name instead of searching for them: pick PDFs
+from your computer, paste DOIs, arXiv IDs or links, or both. Each paper gets its own summary - what it does,
+its results in its own numbers, how it relates to your topic, and its limitations.
+
+- **A link** is resolved through the same indexes a search uses, so its DOI and metadata are the indexes'
+  own and the usual verification table applies.
+- **A PDF** is summarised from its own text, which is stronger evidence than an abstract. The text is
+  extracted on your computer and only the text is sent, so a paper costs a few thousand tokens rather than
+  tens of thousands. Figures are not seen and tables arrive flattened.
+- **A PDF carries no guaranteed DOI.** If one is printed inside, it is used only to *look up* verified
+  metadata; when that lookup fails, or there is no DOI at all, the report says the entry came from your file
+  and quotes no DOI for it. A DOI is never taken from the text at face value.
+- **A scanned PDF with no text layer** is reported as such rather than summarised from nothing.
+- At most 12 papers per run, 60,000 characters each (the report says when a file was truncated).
+- Read-only, like the review: a report in `reports/`, plus a `.bib` of resolved papers not yet in your
+  bibliography. Your paper is never touched.
 
 ### Adding figures
 
@@ -403,6 +422,8 @@ core/
   events.py             → EventBus, ProposedChange, ApprovalGate, CancelToken
   llm_client.py         → streaming Anthropic SDK wrapper (adaptive thinking, caching, fallbacks)
   literature.py         → OpenAlex / Crossref / arXiv clients, provenance registry, verification, BibTeX
+  literature_summary.py → summarising papers you already have (PDF or link), with their provenance
+  pdf_text.py           → pulling the text out of a PDF, and the DOI printed in it
   protection.py         → read-only policy + reference-manager .bib detection
   paper.py              → selected paper: safe path resolution, write guard
   git_manager.py        → clone/pull, feature branches, commit, push strategies, auth errors

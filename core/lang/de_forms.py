@@ -23,6 +23,28 @@ CATALOGUE: dict[str, str] = {
         "erstellt eine Übersicht mit einem Link\nzu jedem Paper, eine Prüftabelle und eine '.bib' mit neuen "
         "Kandidaten.",
 
+    # -- Literature Review: summarising a paper you already have ---------- #
+    "Blank = derived from the selected paper's title and abstract":
+        "Leer = aus Titel und Abstract des gewählten Papers abgeleitet",
+    "Search for papers": "Nach Papern suchen",
+    "Summarise papers I have": "Vorhandene Paper zusammenfassen",
+    "PDFs of papers you already have": "PDFs von Papern, die Sie bereits haben",
+    "Choose the PDF of a paper": "PDF eines Papers auswählen",
+    "No PDFs chosen - click 'Add files…', or give a DOI or link below.":
+        "Keine PDFs ausgewählt – auf 'Dateien hinzufügen…' klicken oder unten eine DOI bzw. einen Link "
+        "angeben.",
+    "…and/or DOIs, arXiv IDs or links - one per line":
+        "…und/oder DOIs, arXiv-IDs oder Links – einer pro Zeile",
+    "Each paper is summarised on its own: what it does, its results, how it relates to your topic\n"
+    "and its limitations. Read-only - a report, never a change to your paper.\n"
+    "A link is resolved through the same indexes as a search, so its DOI is confirmed. A PDF is read\n"
+    "as text (figures and tables are not seen); if it prints a DOI, that is looked up to confirm it.":
+        "Jedes Paper wird einzeln zusammengefasst: worum es geht, die Ergebnisse, der Bezug zu Ihrem Thema\n"
+        "und die Grenzen. Nur lesend – ein Bericht, nie eine Änderung an Ihrem Paper.\n"
+        "Ein Link wird über dieselben Indexe wie bei der Suche aufgelöst, seine DOI ist also bestätigt. Ein "
+        "PDF wird\nals Text gelesen (Abbildungen und Tabellen werden nicht gesehen); eine darin gedruckte "
+        "DOI wird nachgeschlagen.",
+
     # -- Add Figures ----------------------------------------------------- #
     "Images from anywhere on your computer (PNG, JPG, PDF; TIFF/BMP/GIF/WebP are converted)":
         "Bilder von beliebiger Stelle auf dem Computer (PNG, JPG, PDF; TIFF/BMP/GIF/WebP werden umgewandelt)",

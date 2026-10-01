@@ -126,6 +126,19 @@ Overleaf later.
 Your result files are only read. Nothing is written into `data\` or `supplementary\`, and those folders still
 never leave your computer - only the numbers that end up in the figure travel with the paper.
 
+**Summarising a paper you already have**
+
+In **Literature Review**, switch to **Summarise papers I have**. Add PDFs from your computer, or paste DOIs,
+arXiv IDs or links - one per line - or both. Each paper gets its own summary: what it does, its results, how
+it relates to your topic, and its limitations.
+
+A link is looked up in the same catalogues the search uses, so its details are confirmed. A PDF is read as
+text on your computer (the figures are not seen), which keeps it cheap. If a PDF has no confirmed DOI the
+report says so plainly, so you know which summaries rest on the file alone. A scanned PDF with no real text
+cannot be read, and the report tells you that too.
+
+As with the review, nothing in your paper changes - you get a report.
+
 **How approval works**
 
 1. The AI proposes a change. A window shows the old and new text side by side, and the PDF shows the proposed version with an orange label.

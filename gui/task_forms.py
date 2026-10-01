@@ -19,6 +19,7 @@ MUTED = "#8b949e"
 PICKED = "#58a6ff"
 IMAGE_TYPES = [("Images", "*.png *.jpg *.jpeg *.pdf *.tif *.tiff *.bmp *.gif *.webp"), ("All files", "*.*")]
 BIB_TYPES = [("BibTeX", "*.bib"), ("All files", "*.*")]
+PDF_TYPES = [("PDF", "*.pdf"), ("All files", "*.*")]
 
 
 @dataclass
@@ -192,9 +193,18 @@ class Form:
 
 class LiteratureForm(Form):
     workflow = LiteratureReviewWorkflow
+    MODES = ("Search for papers", "Summarise papers I have")
 
     def build(self) -> None:
-        self.entry("topic", t("Topic"), placeholder="Blank = derived from the selected paper's title and abstract")
+        self.mode_choices = Choices(list(self.MODES))
+        self.mode = ctk.CTkSegmentedButton(
+            self.frame, values=self.mode_choices.labels,
+            command=lambda label: self.set_mode(self.mode_choices.value(label)))
+        self._place(self.mode, sticky="w")
+        self.entry("topic", t("Topic"),
+                   placeholder=t("Blank = derived from the selected paper's title and abstract"))
+
+        self._group = self.search_widgets = []
         self.textbox("focus", t("Focus (optional) - sub-questions, methods, exclusions"), height=55)
         self.entry("max_papers", t("Approx. number of papers"), "20", width=120)
         self.entry("year_from", t("Published from (year, optional)"), placeholder="e.g. 2018", width=120)
@@ -202,7 +212,41 @@ class LiteratureForm(Form):
                    "writes a review with a link for every paper,\na verification table and a .bib of new "
                    "candidates."), muted=True)
 
+        self._group = self.summary_widgets = []
+        self.label(t("PDFs of papers you already have"))
+        self.pdfs = FileList(self.frame, t("Choose the PDF of a paper"), PDF_TYPES, height=70)
+        self.pdfs.empty_text = t("No PDFs chosen - click 'Add files…', or give a DOI or link below.")
+        self.pdfs._render()
+        self._place(self.pdfs)
+        self.textbox("identifiers", t("…and/or DOIs, arXiv IDs or links - one per line"), height=55)
+        self.label(t("Each paper is summarised on its own: what it does, its results, how it relates to your "
+                   "topic\nand its limitations. Read-only - a report, never a change to your paper.\n"
+                   "A link is resolved through the same indexes as a search, so its DOI is confirmed. A PDF "
+                   "is read\nas text (figures and tables are not seen); if it prints a DOI, that is looked up "
+                   "to confirm it."), muted=True)
+        self._group = None
+        self.set_mode(self.MODES[0])
+
+    @property
+    def summarising(self) -> bool:
+        return self.mode_choices.value(self.mode.get()) == self.MODES[1]
+
+    def set_mode(self, mode: str) -> None:
+        self.mode.set(self.mode_choices.label(mode))
+        shown, hidden = ((self.summary_widgets, self.search_widgets) if mode == self.MODES[1]
+                         else (self.search_widgets, self.summary_widgets))
+        for widget in hidden:
+            widget.grid_remove()
+        for widget in shown:
+            widget.grid()
+
     def params(self) -> dict[str, Any]:
+        if self.summarising:
+            if not self.pdfs.files and not self.value("identifiers").strip():
+                raise ValueError("Choose a PDF, or enter a DOI, arXiv id or link.")
+            return {"mode": "summarise", "topic": self.value("topic"),
+                    "files": [str(p) for p in self.pdfs.files],
+                    "identifiers": self.value("identifiers")}
         return {"topic": self.value("topic"), "focus": self.value("focus"),
                 "max_papers": self.number("max_papers", 3, 60) or 20,
                 "year_from": self.number("year_from", 1900, datetime.now().year)}

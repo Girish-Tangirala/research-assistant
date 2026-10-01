@@ -57,7 +57,11 @@ python -m venv .venv
   column that does not exist is rejected and repaired. Keep that split — it is the "never invent DOIs" rule for
   numbers. Bar charts keep `ymin=0`.
 - **Checkable literature:** only papers returned by the search tools, each with its DOI/URL; never invent
-  DOIs. The citation audit is deterministic (no LLM).
+  DOIs. The citation audit is deterministic (no LLM). The same rule covers the *Summarise papers I have*
+  mode (`core/literature_summary.py`): a link is resolved through `ScholarlySearch`, and a DOI printed in a
+  user's PDF is only ever used to *look up* verified metadata — when the lookup fails the report says the
+  entry came from the file and quotes no DOI. PDFs are read as text locally (`core/pdf_text.py`), not sent
+  whole, to keep a summary at a few thousand tokens on the user's own API key.
 - **Compiling works like Overleaf:** no `-halt-on-error`; latexmk runs with `-f -g`.
   `CompileResult.success` means "a fresh PDF was produced" and `.clean` means "no errors". An approved change
   is rolled back only if it adds errors (`compiler.new_errors`) or stops the PDF from being produced.

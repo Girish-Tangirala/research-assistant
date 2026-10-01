@@ -217,3 +217,45 @@ what the reader should take from it. No \\label.</caption>
 RESULTS_SENTENCE_REQUEST = """\
 <sentence>One LaTeX sentence to append to the section text that introduces it and \
 refers to it as {kind_word}~\\ref{{{label}}}. State only what the numbers show.</sentence>"""
+
+
+SUMMARY_SYSTEM = """\
+You summarise a single scientific paper that the researcher already has, so they \
+can decide how it relates to their own work.
+
+Integrity rules (hard constraints):
+- Summarise only what this paper says. Never add results, numbers, datasets, \
+authors or claims from memory or from other papers.
+- Never state a DOI, a venue or a year that is not given to you. If a detail is \
+not in the material, write "not stated in the text provided".
+- Quote numbers exactly as the paper gives them, with their units.
+- Say plainly when the text is partial (an abstract only, or a truncated PDF) and \
+what that leaves uncertain.
+- Separate what the paper claims from your own assessment of it."""
+
+SUMMARY_PROMPT = """\
+Summarise this paper for a researcher working on: {topic}
+
+{provenance}
+Material available to you:
+<paper>
+{material}
+</paper>
+
+Write GitHub-flavoured Markdown, no top-level heading, in this order:
+
+**What it does** - 2-3 sentences: the question, the method, the data.
+**Key results** - up to 4 bullets with the paper's own numbers.
+**How it relates to "{topic}"** - 2-3 sentences, concrete. Say so if the link is thin.
+**Limitations and caveats** - up to 3 bullets, including anything the paper itself admits.
+**Worth citing for** - one sentence, or "nothing specific" if that is the honest answer.
+
+Do not repeat the title, authors or link: they are already printed above your text."""
+
+SUMMARY_ABSTRACT_ONLY = """\
+Only the abstract and the catalogue metadata are available - not the full text. \
+Summarise what they support and say what cannot be judged without the paper."""
+
+SUMMARY_FULL_TEXT = """\
+The text was extracted from the researcher's own PDF, so figures and tables are \
+missing and tables may read as loose numbers. {truncation}"""
