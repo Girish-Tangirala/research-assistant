@@ -55,6 +55,16 @@ def test_a_paper_module_never_imports_the_translator(name):
                     f"{name} imports the translator; its output goes into a paper"
 
 
+def test_what_claude_writes_is_pinned_to_english():
+    """A German interface must not produce a German summary, report or caption."""
+    from core.prompts import LIT_REVIEW_SYSTEM, SUMMARY_SYSTEM
+
+    set_language("de")
+    assert "Write in English" in SUMMARY_SYSTEM
+    for prompt in (SUMMARY_SYSTEM, LIT_REVIEW_SYSTEM):
+        assert not re.search(r"[äöüßÄÖÜ]", prompt), "a prompt picked up German"
+
+
 def test_the_prompts_stay_english():
     """The prompts are what keep Claude writing English, whatever the interface says."""
     text = (ROOT / "core/prompts.py").read_text(encoding="utf-8")

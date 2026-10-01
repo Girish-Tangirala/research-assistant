@@ -152,6 +152,76 @@ def test_a_tall_dialog_is_clamped_to_the_screen_and_keeps_its_buttons(app, monke
         dialog.destroy()
 
 
+# ---------------------------------------------------------------------- #
+# Text on screen is often also an identifier. In German the Run button read the
+# dropdown's *translated* label and looked it up in WORKFLOWS, so it raised
+# KeyError inside a Tk callback and the button silently did nothing.
+# ---------------------------------------------------------------------- #
+@pytest.fixture(params=["en", "de"])
+def panel_in(request, app):
+    """A task panel built *while* a language is active.
+
+    The language matters at build time: ``i18n.Choices`` records its labels when
+    the widget is made, which is why the app applies a language change on restart.
+    Switching the language around an already-built panel would prove nothing.
+    """
+    from core.i18n import set_language
+    from core.registry import WORKFLOWS
+    from gui.panels import TaskPanel
+
+    set_language(request.param)
+    panel = TaskPanel(app, list(WORKFLOWS), run=lambda *a: None, cancel=lambda: None,
+                      load_sections=lambda: ["Introduction"], list_bibs=lambda: ["refs.bib"])
+    try:
+        yield request.param, panel
+    finally:
+        panel.destroy()
+        set_language("en")
+
+
+def test_every_task_can_be_selected_and_run_in_every_language(panel_in):
+    """Run resolves the selected task, whatever the dropdown is labelled.
+
+    In German the Run button read the dropdown's translated label and looked it
+    up in WORKFLOWS, so it raised KeyError inside a Tk callback - and the button
+    silently did nothing, for every task.
+    """
+    from core.registry import WORKFLOWS
+
+    language, panel = panel_in
+    started: list[str] = []
+    panel._run = lambda name, params: started.append(name)        # noqa: SLF001
+    for task in WORKFLOWS:
+        panel.select(task)
+        panel.update()
+        assert panel.tasks.value(panel.selector.get()) == task, f"{language}: selector reads back wrong"
+        panel._on_run()                                           # noqa: SLF001 - what the button calls
+    # Forms needing a file raise ValueError first; the rest must reach a real workflow name.
+    assert started, f"{language}: Run never reached a workflow"
+    assert set(started) <= set(WORKFLOWS), f"{language}: Run passed on a translated label: {started}"
+
+
+def test_the_to_do_filters_filter_in_every_language(app, panel_in):
+    """The filters are compared as English however they are labelled."""
+    from core.todos import TodoDoc, TodoItem
+    from gui.todo_panel import TodoContext, TodoPanel
+
+    language, _ = panel_in
+    panel = TodoPanel(app, TodoContext(make_store=lambda: None, load_sections=list,
+                                       notify=lambda *a: None, handle_error=lambda exc: None))
+    try:
+        panel.doc = TodoDoc([TodoItem(text="open one", id="aaa11111"),
+                             TodoItem(text="done one", id="bbb22222", done=True)])
+        panel.me = ""
+        for internal, expected in (("Open", {"open one"}), ("Done", {"done one"}),
+                                   ("All", {"open one", "done one"})):
+            panel.filter.set(panel.filters.label(internal))
+            assert {i.text for i in panel.visible_items()} == expected, \
+                f"{language}: the {internal!r} filter showed the wrong tasks"
+    finally:
+        panel.destroy()
+
+
 def test_the_window_starts_maximised_not_full_screen(app):
     """Full screen hides the title bar, so it is opt-in rather than the default."""
     assert app.fullscreen_var.get() is False

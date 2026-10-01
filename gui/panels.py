@@ -122,7 +122,7 @@ class TaskPanel(ctk.CTkFrame):
         self.context.refresh_sections(titles)
 
     def _on_run(self) -> None:
-        name = self.selector.get()
+        name = self.tasks.value(self.selector.get())      # the widget shows the translation
         try:
             params = self.forms[name].params()
         except ValueError as exc:

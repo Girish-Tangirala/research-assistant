@@ -68,7 +68,7 @@ class TexEditor(ctk.CTkFrame):
 
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(fill="x", pady=(0, 4))
-        self.file_menu = ctk.CTkOptionMenu(bar, values=[NO_FILE], width=260, dynamic_resizing=False,
+        self.file_menu = ctk.CTkOptionMenu(bar, values=[t(NO_FILE)], width=260, dynamic_resizing=False,
                                            command=lambda rel: self.open_file(rel))
         self.file_menu.pack(side="left")
         ctk.CTkButton(bar, text="↻", width=30, fg_color="transparent", border_width=1,
@@ -135,8 +135,8 @@ class TexEditor(ctk.CTkFrame):
     # ------------------------------------------------------------------ #
     def refresh_files(self) -> list[str]:
         files = editable_files(self.root) if self.root is not None else []
-        self.file_menu.configure(values=files or [NO_FILE])
-        self.file_menu.set(self.rel if self.rel in files else (NO_FILE if not files else self.file_menu.get()))
+        self.file_menu.configure(values=files or [t(NO_FILE)])
+        self.file_menu.set(self.rel if self.rel in files else (t(NO_FILE) if not files else self.file_menu.get()))
         return files
 
     def paper_changed(self) -> None:
@@ -152,16 +152,16 @@ class TexEditor(ctk.CTkFrame):
         if files:
             self._load(files[0])
         else:
-            self.file_menu.set(NO_FILE)
+            self.file_menu.set(t(NO_FILE))
             self._show_status()
 
     def open_file(self, rel: str, line: int | None = None) -> None:
         """Show ``rel`` (asking about unsaved edits in another file) and jump to ``line``."""
-        if rel == NO_FILE:
+        if rel == t(NO_FILE):
             return
         if rel != self.rel:
             if not self._confirm_leave():
-                self.file_menu.set(self.rel or NO_FILE)
+                self.file_menu.set(self.rel or t(NO_FILE))
                 return
             if not self._load(rel):
                 return

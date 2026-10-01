@@ -18,7 +18,7 @@ import customtkinter as ctk
 from core.events import EventKind
 from core.todos import TodoDoc, TodoError, TodoItem, TodoStore, op_add, op_delete, op_update
 from gui.dialogs import _Dialog, run_in_background
-from core.i18n import t
+from core.i18n import Choices, t
 
 MUTED, OVERDUE, DONE = "#8b949e", "#f85149", "#3fb950"
 FILTERS = ("Open", "Mine", "Overdue", "Done", "All")
@@ -95,12 +95,15 @@ class TodoPanel(ctk.CTkFrame):
         bar.pack(fill="x", pady=(0, 6))
         self.refresh_button = ctk.CTkButton(bar, text=t("⟳ Refresh"), width=100, command=self.refresh)
         self.refresh_button.pack(side="left")
-        self.filter = ctk.CTkSegmentedButton(bar, values=list(FILTERS), command=lambda _v: self.render())
-        self.filter.set("Open")
+        # Shown translated, compared as English - visible_items() switches on these.
+        self.filters = Choices(list(FILTERS))
+        self.filter = ctk.CTkSegmentedButton(bar, values=self.filters.labels,
+                                             command=lambda _v: self.render())
+        self.filter.set(self.filters.label("Open"))
         self.filter.pack(side="left", padx=10)
-        self.paper_filter = ctk.CTkComboBox(bar, values=[ALL_PAPERS], width=150,
+        self.paper_filter = ctk.CTkComboBox(bar, values=[t(ALL_PAPERS)], width=150,
                                             command=lambda _v: self.render())
-        self.paper_filter.set(ALL_PAPERS)
+        self.paper_filter.set(t(ALL_PAPERS))
         self.paper_filter.pack(side="left", fill="x", expand=True)
         # Its own line: beside the filters it was pushed off the edge of the narrow column.
         self.status = ctk.CTkLabel(self, text="", text_color=MUTED, anchor="w")
@@ -123,8 +126,8 @@ class TodoPanel(ctk.CTkFrame):
         self.new_assignee = ctk.CTkComboBox(fields, values=[""])
         self.new_assignee.set("")
         self.new_due = ctk.CTkEntry(fields, placeholder_text=t("YYYY-MM-DD"))
-        self.new_paper = ctk.CTkComboBox(fields, values=[NO_PAPER])
-        self.new_paper.set(NO_PAPER)
+        self.new_paper = ctk.CTkComboBox(fields, values=[t(NO_PAPER)])
+        self.new_paper.set(t(NO_PAPER))
         self.new_section = ctk.CTkComboBox(fields, values=[""])
         self.new_section.set("")
         for column, (caption, widget) in enumerate((("Assign to", self.new_assignee), ("Due date", self.new_due),
@@ -225,15 +228,16 @@ class TodoPanel(ctk.CTkFrame):
 
     def _refresh_paper_choices(self) -> None:
         papers = self.ctx.paper_names()
-        self.paper_filter.configure(values=[ALL_PAPERS] + papers)
-        if self.paper_filter.get() not in [ALL_PAPERS] + papers:
-            self.paper_filter.set(ALL_PAPERS)
-        self.new_paper.configure(values=[NO_PAPER] + papers)
+        # The sentinels are shown translated; paper names are the user's own text.
+        self.paper_filter.configure(values=[t(ALL_PAPERS)] + papers)
+        if self.paper_filter.get() not in [t(ALL_PAPERS)] + papers:
+            self.paper_filter.set(t(ALL_PAPERS))
+        self.new_paper.configure(values=[t(NO_PAPER)] + papers)
         current = self.ctx.current_paper()
         if current in papers:            # new tasks default to the paper you are working on
             self.new_paper.set(current)
-        elif self.new_paper.get() not in [NO_PAPER] + papers:
-            self.new_paper.set(NO_PAPER)
+        elif self.new_paper.get() not in [t(NO_PAPER)] + papers:
+            self.new_paper.set(t(NO_PAPER))
 
     def _load_local_copy(self) -> None:
         """Show the last synced copy straight away, before the network answers."""
@@ -271,7 +275,7 @@ class TodoPanel(ctk.CTkFrame):
     def add(self) -> None:
         text, assignee = self.new_text.get(), self.new_assignee.get()
         due, section = self.new_due.get(), self.new_section.get()
-        paper = "" if self.new_paper.get() == NO_PAPER else self.new_paper.get()
+        paper = "" if self.new_paper.get() == t(NO_PAPER) else self.new_paper.get()
         self._apply(lambda me: op_add(text, me, assignee, due, section, paper), f"Task added: {text.strip()[:60]}")
         for entry in (self.new_text, self.new_due):
             if entry.get():  # deleting an empty entry would also remove its placeholder hint
@@ -299,12 +303,12 @@ class TodoPanel(ctk.CTkFrame):
     # ------------------------------------------------------------------ #
     def visible_items(self) -> list[TodoItem]:
         items = self.doc.items if self.doc else []
-        mode = self.filter.get()
+        mode = self.filters.value(self.filter.get())      # the widgets show the translations
         me = (self.me or "").lower()
         paper = self.paper_filter.get()
-        if paper == NO_PAPER:
+        if paper == t(NO_PAPER):
             items = [i for i in items if not i.paper]
-        elif paper != ALL_PAPERS:
+        elif paper != t(ALL_PAPERS):
             items = [i for i in items if i.paper == paper]
         if mode == "Open":
             items = [i for i in items if not i.done]

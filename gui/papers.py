@@ -46,8 +46,8 @@ class PapersMixin:
     def _refresh_papers(self) -> None:
         names = self.app_state.names
         current = self.app_state.current
-        self.paper_menu.configure(values=names or [NO_PAPER])
-        self.paper_menu.set(current.name if current else NO_PAPER)
+        self.paper_menu.configure(values=names or [t(NO_PAPER)])
+        self.paper_menu.set(current.name if current else t(NO_PAPER))
         if current:
             self.app_state.selected = current.name
             root = Path(current.local_path).expanduser()
@@ -79,7 +79,7 @@ class PapersMixin:
         self.editor_paper_changed()
 
     def _select_paper(self, name: str) -> None:
-        if name == NO_PAPER:
+        if name == t(NO_PAPER):
             return
         self.app_state.selected = name
         self._save_state()

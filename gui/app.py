@@ -161,7 +161,7 @@ class ResearchAssistantApp(TodoSetupMixin, AccountsMixin, PapersMixin, PreviewMi
                      text_color=MUTED, font=ctk.CTkFont(size=11)).pack(anchor="w", padx=10, pady=(0, 4))
 
         paper = self._section(side, "Paper")
-        self.paper_menu = ctk.CTkOptionMenu(paper, values=[NO_PAPER], command=self._select_paper)
+        self.paper_menu = ctk.CTkOptionMenu(paper, values=[t(NO_PAPER)], command=self._select_paper)
         self.paper_menu.pack(fill="x", padx=10, pady=4)
         self.paper_info = ctk.CTkLabel(paper, text="", text_color=MUTED, wraplength=wrap, justify="left", anchor="w",
                                        font=ctk.CTkFont(size=11))

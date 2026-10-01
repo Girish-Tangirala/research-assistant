@@ -231,7 +231,9 @@ not in the material, write "not stated in the text provided".
 - Quote numbers exactly as the paper gives them, with their units.
 - Say plainly when the text is partial (an abstract only, or a truncated PDF) and \
 what that leaves uncertain.
-- Separate what the paper claims from your own assessment of it."""
+- Separate what the paper claims from your own assessment of it.
+- Write in English, whatever language the paper or the application's interface is \
+in. The researcher publishes in English and may paste from this summary."""
 
 SUMMARY_PROMPT = """\
 Summarise this paper for a researcher working on: {topic}
